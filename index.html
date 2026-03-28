@@ -1,0 +1,3556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dijkstra's Algorithm – Interactive Visualizer</title>
+<style>
+/* ─── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0f1117;
+  --panel:     #1a1d27;
+  --card:      #22263a;
+  --border:    #2e3354;
+  --accent:    #4f8ef7;
+  --green:     #3ecf8e;
+  --red:       #f76f6f;
+  --yellow:    #f7c948;
+  --orange:    #f7965a;
+  --purple:    #a78bfa;
+  --text:      #e2e8f0;
+  --muted:     #8892b0;
+  --font:      'Segoe UI', system-ui, sans-serif;
+  --mono:      'Consolas', 'Courier New', monospace;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; }
+
+/* ─── Layout ───────────────────────────────────────────────── */
+#app {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  grid-template-rows: auto 1fr;
+  height: 100vh;    /* fill full viewport */
+  overflow: hidden; /* prevent double scrollbars */
+}
+
+#header {
+  grid-column: 1 / -1;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+#header h1 { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: .5px; }
+#header span { color: var(--muted); font-size: 13px; }
+
+#left-panel {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+#right-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;   /* allow flex shrink inside grid */
+  height: calc(100vh - 49px); /* full viewport minus header */
+}
+
+/* ─── Cards ────────────────────────────────────────────────── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.card-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+/* ─── Buttons ──────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 7px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+}
+.btn:hover { filter: brightness(1.15); }
+.btn:active { transform: scale(.96); }
+.btn:disabled { opacity: .4; cursor: not-allowed; filter: none; transform: none; }
+
+.btn-primary  { background: var(--accent);  color: #fff; }
+.btn-success  { background: var(--green);   color: #0f1117; }
+.btn-warning  { background: var(--yellow);  color: #0f1117; }
+.btn-danger   { background: var(--red);     color: #fff; }
+.btn-neutral  { background: var(--border);  color: var(--text); }
+.btn-purple   { background: var(--purple);  color: #fff; }
+
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+
+/* ─── Preset buttons ───────────────────────────────────────── */
+#presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.preset-btn {
+  flex: 1 1 auto;
+  background: var(--border);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  text-align: center;
+}
+.preset-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.preset-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ─── Textarea input ───────────────────────────────────────── */
+textarea {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  resize: vertical;
+  min-height: 90px;
+  outline: none;
+  transition: border-color .15s;
+}
+textarea:focus { border-color: var(--accent); }
+
+/* ─── Source node input ────────────────────────────────────── */
+.input-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.input-row label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+input[type="text"] {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 13px;
+  width: 70px;
+  outline: none;
+  transition: border-color .15s;
+}
+input[type="text"]:focus { border-color: var(--accent); }
+
+/* ─── Playback controls ────────────────────────────────────── */
+#playback-row { display: flex; gap: 6px; flex-wrap: wrap; }
+#playback-row .btn { flex: 1 1 auto; }
+
+/* ─── Speed slider ─────────────────────────────────────────── */
+.slider-row { display: flex; align-items: center; gap: 10px; }
+.slider-row label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 4px;
+  cursor: pointer;
+}
+#speed-label { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 36px; text-align: right; }
+
+/* ─── Status row ───────────────────────────────────────────── */
+.info-row { display: flex; justify-content: space-between; align-items: center; }
+#status-badge {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  background: var(--border);
+  color: var(--muted);
+}
+#status-badge.idle    { background: #2e3354; color: var(--muted); }
+#status-badge.ready   { background: #1e3a5f; color: var(--accent); }
+#status-badge.playing { background: #1a3a2a; color: var(--green); }
+#status-badge.paused  { background: #3a2e1a; color: var(--yellow); }
+#status-badge.done    { background: #1a3a2a; color: var(--green); }
+
+#step-counter { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ─── Statistics ───────────────────────────────────────────── */
+#stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.stat-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 8px;
+  text-align: center;
+}
+.stat-val { font-size: 22px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+.stat-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; letter-spacing: .5px; text-transform: uppercase; }
+
+/* ─── Distances table ──────────────────────────────────────── */
+#dist-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#dist-table th { color: var(--muted); font-weight: 600; padding: 4px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+#dist-table td { padding: 5px 8px; border-bottom: 1px solid #1e2235; font-family: var(--mono); }
+#dist-table tr.current-row td { color: var(--yellow); font-weight: 700; }
+#dist-table tr.visited-row td { color: var(--green); }
+#dist-table tr.updated-row td:last-child { color: var(--orange); }
+
+/* ─── Priority Queue ───────────────────────────────────────── */
+#pq-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 36px; }
+.pq-item {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  transition: all .25s;
+  position: relative;
+}
+.pq-item.pq-min { border-color: var(--yellow); color: var(--yellow); background: #2a2400; }
+.pq-item.pq-updated { border-color: var(--orange); color: var(--orange); }
+
+/* ─── Right panel sections ─────────────────────────────────── */
+#viz-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 200px;  /* never collapses to zero */
+}
+
+#graph-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* SVG element styles */
+.node-circle {
+  stroke-width: 2.5;
+  transition: fill .25s, stroke .25s;
+  cursor: pointer;
+}
+.node-label {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 14px;
+  pointer-events: none;
+  dominant-baseline: central;
+  text-anchor: middle;
+}
+.dist-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  pointer-events: none;
+  dominant-baseline: central;
+  text-anchor: middle;
+  transition: all .25s;
+}
+.edge-line {
+  stroke-width: 2;
+  transition: stroke .25s, stroke-width .25s;
+}
+.edge-weight {
+  font-family: var(--mono);
+  font-size: 11px;
+  pointer-events: none;
+  dominant-baseline: central;
+  text-anchor: middle;
+}
+
+/* ─── Bottom panels (pseudocode + explanation) ─────────────── */
+#bottom-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 220px;
+  border-top: 1px solid var(--border);
+}
+
+#pseudocode-panel {
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  overflow-y: auto;
+  padding: 10px;
+}
+
+#pseudocode-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.pseudo-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: default;
+  transition: background .15s;
+  position: relative;
+}
+.pseudo-line:hover { background: var(--border); }
+.pseudo-line.active { background: #1e3a5f; border-left: 3px solid var(--accent); }
+.pseudo-num { color: var(--muted); min-width: 22px; user-select: none; }
+.pseudo-text { color: var(--text); }
+.pseudo-line.active .pseudo-text { color: var(--accent); }
+
+/* Tooltip */
+.pseudo-line .tooltip {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: 0;
+  background: #181c2e;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--text);
+  white-space: nowrap;
+  z-index: 100;
+  max-width: 260px;
+  white-space: normal;
+  min-width: 160px;
+  margin-left: 4px;
+  box-shadow: 0 4px 16px #0008;
+}
+.pseudo-line:hover .tooltip { display: block; }
+
+/* ─── Explanation panel ────────────────────────────────────── */
+#explanation-panel {
+  background: var(--panel);
+  padding: 10px 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#explanation-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+#explanation-text {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+  flex: 1;
+}
+#explanation-text .highlight { color: var(--yellow); font-weight: 700; }
+#explanation-text .node-ref  { color: var(--accent);  font-weight: 700; font-family: var(--mono); }
+#explanation-text .val-ref   { color: var(--green);   font-weight: 700; font-family: var(--mono); }
+#explanation-text .edge-ref  { color: var(--orange);  font-weight: 700; }
+
+/* ─── Legend ───────────────────────────────────────────────── */
+#legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.legend-dot {
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  flex-shrink: 0;
+}
+
+/* ─── History table ────────────────────────────────────────── */
+#history-wrap { max-height: 160px; overflow-y: auto; }
+#history-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+#history-table th { color: var(--muted); font-weight: 600; padding: 3px 6px; text-align: left; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--card); }
+#history-table td { padding: 3px 6px; border-bottom: 1px solid #1e2235; }
+#history-table tr { cursor: pointer; transition: background .1s; }
+#history-table tr:hover td { background: var(--border); }
+#history-table tr.hist-active td { background: #1e3a5f; color: var(--accent); }
+
+/* ─── Responsive ───────────────────────────────────────────── */
+@media (max-width: 979px) {
+  #app { grid-template-columns: 1fr; height: auto; overflow: auto; }
+  #header { grid-column: 1; }
+  #left-panel { border-right: none; border-bottom: 1px solid var(--border); max-height: none; }
+  #right-panel { min-height: 600px; height: auto; }
+  #tab-viz { min-height: 600px; }
+  #viz-container { min-height: 300px; }
+  #bottom-panels { grid-template-columns: 1fr; height: auto; }
+  #pseudocode-panel { height: 200px; border-right: none; border-bottom: 1px solid var(--border); }
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ─── Animations ───────────────────────────────────────────── */
+@keyframes pulse-ring {
+  0%   { r: 22px; opacity: .8; }
+  100% { r: 32px; opacity: 0; }
+}
+.pulse-circle { animation: pulse-ring .6s ease-out forwards; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.fade-in { animation: fadeIn .2s ease forwards; }
+
+/* ─── Tab bar ──────────────────────────────────────────────── */
+#tab-bar {
+  display: flex;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  gap: 0;
+}
+.tab-btn {
+  padding: 10px 20px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.tab-panel { display: none; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; }
+.tab-panel.active { display: flex; }
+
+/* tab-viz specifically: legend + svg + bottom panels stacked */
+/* #tab-viz gets display:flex from .tab-panel.active — do NOT set display here */
+#tab-viz {
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ─── Scrollable inner panels (all non-viz tabs) ───────────── */
+#clo1-panel, #clo2-panel, #clo3-panel, #edu-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ─── Complexity Analysis panel ────────────────────────────── */
+#clo1-panel {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: var(--bg);
+}
+
+/* Complexity cards row */
+.complexity-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.complexity-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.complexity-card .cx-val {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.complexity-card .cx-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.complexity-card .cx-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* Chart container */
+#growth-chart-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+#growth-chart-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+#growth-chart-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+#growth-chart-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  align-items: center;
+}
+#growth-chart-controls label { font-size: 12px; color: var(--muted); }
+#n-slider { accent-color: var(--accent); }
+#n-label { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 40px; }
+.chart-legend { display: flex; gap: 14px; flex-wrap: wrap; }
+.chart-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.chart-legend-swatch { width: 24px; height: 3px; border-radius: 2px; }
+
+#growth-svg { display: block; width: 100%; border-radius: 6px; background: var(--bg); }
+
+/* Negative weights demo */
+#neg-demo-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.neg-demo-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--red);
+  margin-bottom: 6px;
+}
+.neg-demo-body {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.7;
+}
+.neg-demo-body .hl { color: var(--red); font-weight: 700; }
+.neg-demo-body .ok { color: var(--green); font-weight: 700; }
+.neg-demo-body .node { color: var(--accent); font-family: var(--mono); font-weight: 700; }
+.neg-demo-body code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+/* Comparison table */
+#compare-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+#compare-wrap h3 { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+#compare-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#compare-table th {
+  background: var(--bg);
+  color: var(--muted);
+  font-weight: 700;
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+}
+#compare-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5; }
+#compare-table tr:last-child td { border-bottom: none; }
+#compare-table td:first-child { font-weight: 700; color: var(--accent); font-family: var(--mono); }
+.cell-good { color: var(--green); }
+.cell-bad  { color: var(--red); }
+.cell-warn { color: var(--yellow); }
+
+/* Worst-case section */
+#worst-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+#worst-wrap h3 { font-size: 13px; font-weight: 700; color: var(--yellow); margin-bottom: 8px; }
+.worst-body { font-size: 12px; color: var(--text); line-height: 1.7; }
+.worst-body .hl { color: var(--yellow); font-weight: 700; }
+
+/* ─── CLO-2: Priority Queue Panel ─────────────────────────── */
+#clo2-panel {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: var(--bg);
+}
+
+/* PQ concept cards */
+.pq-concept-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.pq-concept-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+.pq-concept-card .pcc-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 6px;
+  font-family: var(--mono);
+}
+.pq-concept-card .pcc-body {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.pq-concept-card .pcc-complexity {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--yellow);
+  font-weight: 700;
+}
+
+/* Heap visualizer */
+#heap-demo-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+#heap-demo-wrap h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+#heap-demo-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+#heap-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  align-items: center;
+}
+#heap-op-label {
+  font-size: 12px;
+  color: var(--text);
+  padding: 6px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: var(--mono);
+  flex: 1;
+  min-width: 200px;
+}
+#heap-svg-wrap {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 8px;
+}
+#heap-svg { display: block; width: 100%; }
+
+/* Array view */
+#array-view {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  align-items: flex-end;
+}
+.array-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.array-cell-box {
+  width: 44px;
+  height: 36px;
+  border-radius: 6px;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  transition: all .25s;
+}
+.array-cell-box.ac-min      { border-color: var(--yellow); color: var(--yellow); background: #2a2400; }
+.array-cell-box.ac-updated  { border-color: var(--orange); color: var(--orange); background: #2a1a00; }
+.array-cell-box.ac-normal   { color: var(--text); }
+.array-cell-idx { font-size: 10px; color: var(--muted); }
+
+/* Step-by-step pq trace */
+#pq-trace-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+#pq-trace-wrap h3 { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+#pq-trace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.pq-trace-row {
+  display: grid;
+  grid-template-columns: 28px 90px 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 7px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  transition: border-color .2s;
+}
+.pq-trace-row.tr-extract  { border-color: var(--yellow); }
+.pq-trace-row.tr-decrease { border-color: var(--orange); }
+.pq-trace-row.tr-init     { border-color: var(--accent); }
+.pq-trace-step  { color: var(--muted); font-family: var(--mono); }
+.pq-trace-op    { font-weight: 700; font-family: var(--mono); font-size: 11px; }
+.op-extract  { color: var(--yellow); }
+.op-decrease { color: var(--orange); }
+.op-init     { color: var(--accent); }
+.pq-trace-desc { color: var(--text); line-height: 1.5; }
+
+/* Impact analysis */
+#impact-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+#impact-wrap h3 { font-size: 13px; font-weight: 700; color: var(--red); margin-bottom: 10px; }
+.impact-scenario {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.impact-scenario:last-child { margin-bottom: 0; }
+.impact-scenario-title { font-size: 12px; font-weight: 700; color: var(--yellow); margin-bottom: 6px; }
+.impact-scenario-body { font-size: 12px; color: var(--text); line-height: 1.7; }
+.impact-scenario-body .bad  { color: var(--red);    font-weight: 700; }
+.impact-scenario-body .good { color: var(--green);  font-weight: 700; }
+.impact-scenario-body code {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+/* ─── CLO-3: Greedy Paradigm Panel ────────────────────────── */
+#clo3-panel {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: var(--bg);
+}
+
+/* Paradigm badge */
+#greedy-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.paradigm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border: 2px solid;
+}
+.paradigm-badge.greedy { background: #1a3a00; border-color: #3ecf8e; color: #3ecf8e; }
+.paradigm-badge.dp     { background: #1e1a3a; border-color: #a78bfa; color: #a78bfa; }
+
+.paradigm-desc {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+  min-width: 200px;
+}
+.paradigm-desc strong { color: var(--green); }
+
+/* Greedy steps animator */
+#greedy-anim-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+#greedy-anim-wrap h3 { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+#greedy-anim-sub { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+
+#greedy-anim-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+#greedy-step-box {
+  font-size: 12px;
+  color: var(--text);
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  flex: 1;
+  min-width: 200px;
+  line-height: 1.6;
+}
+
+#greedy-svg-wrap { background: var(--bg); border-radius: 8px; padding: 8px; }
+#greedy-svg { display: block; width: 100%; }
+
+/* Greedy choice list */
+#greedy-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 10px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.greedy-choice-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  transition: border-color .2s;
+}
+.greedy-choice-row.gc-current { border-color: var(--yellow); }
+.greedy-choice-row.gc-done    { border-color: var(--green);  }
+.gc-num    { color: var(--muted); font-family: var(--mono); min-width: 20px; }
+.gc-node   { font-family: var(--mono); font-weight: 700; min-width: 30px; }
+.gc-dist   { color: var(--yellow); font-family: var(--mono); min-width: 50px; }
+.gc-reason { color: var(--muted); flex: 1; }
+.gc-check  { margin-left: auto; font-size: 14px; }
+
+/* Proof box */
+#proof-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--green);
+  border-radius: 10px;
+  padding: 16px;
+}
+#proof-wrap h3 { font-size: 13px; font-weight: 700; color: var(--green); margin-bottom: 10px; }
+.proof-body { font-size: 12px; color: var(--text); line-height: 1.8; }
+.proof-body .thm { color: var(--yellow); font-weight: 700; }
+.proof-body .key { color: var(--accent); font-weight: 700; }
+.proof-step {
+  display: flex;
+  gap: 10px;
+  margin: 6px 0;
+  padding: 6px 10px;
+  background: var(--bg);
+  border-radius: 6px;
+}
+.proof-step-num { color: var(--green); font-weight: 800; font-family: var(--mono); min-width: 20px; }
+
+/* BF comparison */
+#bf-compare-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+#bf-compare-wrap h3 { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+
+#bf-side-by-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 700px) { #bf-side-by-side { grid-template-columns: 1fr; } }
+
+.algo-column {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+.algo-column-title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.algo-column.dijkstra .algo-column-title { color: var(--green); }
+.algo-column.bellman  .algo-column-title { color: var(--purple); }
+
+.algo-trace-list { display: flex; flex-direction: column; gap: 4px; }
+.algo-trace-item {
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border-left: 3px solid transparent;
+  color: var(--text);
+  line-height: 1.5;
+}
+.algo-trace-item.ati-process { border-color: var(--yellow); color: var(--yellow); }
+.algo-trace-item.ati-relax   { border-color: var(--orange); }
+.algo-trace-item.ati-done    { border-color: var(--green);  color: var(--green); }
+.algo-trace-item.ati-error   { border-color: var(--red);    color: var(--red); }
+
+#bf-run-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+#bf-verdict {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  display: none;
+}
+#bf-verdict.verdict-match    { background: #1a3a00; border: 1px solid var(--green);  color: var(--green); }
+#bf-verdict.verdict-mismatch { background: #3a0000; border: 1px solid var(--red);    color: var(--red); }
+
+/* Counterexample */
+#counter-wrap {
+  background: var(--card);
+  border: 1px solid #f76f6f44;
+  border-radius: 10px;
+  padding: 16px;
+}
+#counter-wrap h3 { font-size: 13px; font-weight: 700; color: var(--red); margin-bottom: 10px; }
+.counter-body { font-size: 12px; color: var(--text); line-height: 1.8; }
+.counter-body .bad  { color: var(--red);    font-weight: 700; }
+.counter-body .good { color: var(--green);  font-weight: 700; }
+.counter-body .node { color: var(--accent); font-family: var(--mono); font-weight: 700; }
+#counter-svg-wrap { background: var(--bg); border-radius: 8px; padding: 12px; margin: 10px 0; }
+#counter-svg { display: block; margin: 0 auto; }
+
+/* ─── Phase 5: Educational Content ────────────────────────── */
+#edu-panel {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--bg);
+}
+
+/* Collapsible section */
+.collapsible {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s;
+}
+.collapsible-header:hover { background: #2a2e42; }
+.collapsible-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.collapsible-icon {
+  font-size: 14px;
+  font-weight: 700;
+  transition: transform .3s ease;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.collapsible.open .collapsible-icon { transform: rotate(180deg); }
+
+/* Smooth slide animation via max-height */
+.collapsible-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .35s ease, padding .3s ease;
+  padding: 0 16px;
+  border-top: 0px solid var(--border);
+}
+.collapsible.open .collapsible-body {
+  max-height: 420px;          /* cap — triggers the scroll area inside */
+  padding: 0;
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* Inner scroll container — the actual scrollable area */
+.collapsible-scroll {
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 16px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.collapsible-scroll::-webkit-scrollbar { width: 5px; }
+.collapsible-scroll::-webkit-scrollbar-track { background: transparent; }
+.collapsible-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.collapsible-scroll::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* (edu-section typography is defined with quick-ref above) */
+
+/* Key concept boxes */
+.concept-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+.concept-box {
+  border-radius: 8px;
+  padding: 14px;
+  border: 1px solid transparent;
+}
+.concept-box.cb-blue   { background: #0e1e3a; border-color: #1e4080; }
+.concept-box.cb-green  { background: #0e2a1c; border-color: #1e5a38; }
+.concept-box.cb-yellow { background: #2a2000; border-color: #504010; }
+.concept-box.cb-red    { background: #2a0e0e; border-color: #602020; }
+.concept-box.cb-purple { background: #1a1030; border-color: #402880; }
+.concept-box-title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 6px;
+}
+.cb-blue   .concept-box-title { color: #4f8ef7; }
+.cb-green  .concept-box-title { color: #3ecf8e; }
+.cb-yellow .concept-box-title { color: #f7c948; }
+.cb-red    .concept-box-title { color: #f76f6f; }
+.cb-purple .concept-box-title { color: #a78bfa; }
+.concept-box-body { font-size: 12px; color: var(--muted); line-height: 1.7; }
+
+/* Worked example steps */
+.worked-step {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  align-items: start;
+}
+.worked-step:last-child { border-bottom: none; }
+.worked-step-num {
+  width: 28px; height: 28px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.worked-step-body { font-size: 13px; color: var(--text); line-height: 1.8; }
+.worked-step-body .ws-node  { color: var(--accent);  font-family: var(--mono); font-weight: 700; }
+.worked-step-body .ws-dist  { color: var(--green);   font-family: var(--mono); font-weight: 700; }
+.worked-step-body .ws-edge  { color: var(--orange);  font-weight: 700; }
+.worked-step-body .ws-pick  { color: var(--yellow);  font-weight: 700; }
+.worked-step-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 12px;
+  font-family: var(--mono);
+}
+.worked-step-table th {
+  background: var(--bg);
+  color: var(--muted);
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  font-weight: 700;
+  text-align: center;
+}
+.worked-step-table td {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.worked-step-table tr.wt-current td { background: #2a2400; color: var(--yellow); }
+.worked-step-table tr.wt-updated td:last-child { color: var(--orange); }
+.worked-step-table tr.wt-visited td { color: var(--green); }
+
+/* Common mistakes */
+.mistake-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.mistake-item {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--red);
+  border-radius: 6px;
+  align-items: start;
+}
+.mistake-icon { font-size: 18px; }
+.mistake-body { font-size: 12px; color: var(--text); line-height: 1.7; }
+.mistake-body strong { color: var(--red); }
+.mistake-body .fix { color: var(--green); font-weight: 700; }
+
+/* Quick-reference card */
+.quick-ref {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.quick-ref-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 16px;
+}
+.qr-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.qr-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+.qr-val   { color: var(--accent); font-weight: 700; font-size: 13px; }
+
+/* Table overflow wrapper */
+.table-scroll { overflow-x: auto; width: 100%; border-radius: 6px; }
+
+/* edu-section top margin after header */
+.collapsible.open .collapsible-body .edu-section > *:first-child { margin-top: 4px; }
+.edu-section p  { font-size: 13px; color: var(--text); line-height: 1.8; margin-bottom: 10px; }
+.edu-section p:last-child { margin-bottom: 0; }
+.edu-section h4 {
+  font-size: 12px; font-weight: 700; color: var(--accent);
+  text-transform: uppercase; letter-spacing: .5px;
+  margin: 16px 0 6px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.edu-section ul, .edu-section ol {
+  padding-left: 20px; font-size: 13px; color: var(--text); line-height: 2;
+}
+.edu-section li { margin-bottom: 2px; }
+.edu-section strong { color: var(--yellow); }
+.edu-section code {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 6px;
+  font-family: var(--mono); font-size: 12px; color: var(--green);
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- ═══ HEADER ═══════════════════════════════════════════════ -->
+  <header id="header">
+    <h1>Dijkstra's Algorithm</h1>
+    <span>Single-Source Shortest Path &nbsp;·&nbsp; O((V + E) log V)</span>
+  </header>
+
+  <!-- ═══ LEFT PANEL ════════════════════════════════════════════ -->
+  <aside id="left-panel">
+
+    <!-- Presets -->
+    <div class="card">
+      <div class="card-title">Preset Graphs</div>
+      <div id="presets">
+        <button class="preset-btn active" data-preset="0">Simple 5-node</button>
+        <button class="preset-btn" data-preset="1">Classic 7-node</button>
+        <button class="preset-btn" data-preset="2">Dense 6-node</button>
+        <button class="preset-btn" data-preset="3">Negative weights ⚠</button>
+      </div>
+    </div>
+
+    <!-- Custom Input -->
+    <div class="card">
+      <div class="card-title">Custom Graph Input</div>
+      <div class="input-row">
+        <label>Source node:</label>
+        <input type="text" id="source-input" value="A" maxlength="3" />
+      </div>
+      <textarea id="edge-input" placeholder="Format: FROM TO WEIGHT (one per line)
+Example:
+A B 4
+A C 2
+B D 5
+C D 1"></textarea>
+      <div style="margin-top:8px; display:flex; gap:6px;">
+        <button class="btn btn-neutral btn-sm" id="btn-load-custom" style="flex:1">Load Graph</button>
+      </div>
+    </div>
+
+    <!-- Playback -->
+    <div class="card">
+      <div class="card-title">Playback</div>
+      <div id="playback-row" style="margin-bottom:10px;">
+        <button class="btn btn-primary"  id="btn-build">▶ Build Steps</button>
+        <button class="btn btn-neutral"  id="btn-step"  disabled>Step →</button>
+        <button class="btn btn-success"  id="btn-play"  disabled>▷ Play</button>
+        <button class="btn btn-warning"  id="btn-pause" disabled>⏸ Pause</button>
+        <button class="btn btn-danger"   id="btn-reset" disabled>↺ Reset</button>
+      </div>
+      <div class="slider-row" style="margin-bottom:10px;">
+        <label>Speed:</label>
+        <input type="range" id="speed-slider" min="0.25" max="4" step="0.25" value="1" />
+        <span id="speed-label">1x</span>
+      </div>
+      <div class="info-row">
+        <span id="step-counter">Step – / –</span>
+        <span id="status-badge" class="idle">IDLE</span>
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="card">
+      <div class="card-title">Statistics</div>
+      <div id="stats-grid">
+        <div class="stat-box"><div class="stat-val" id="stat-relaxations">0</div><div class="stat-lbl">Relaxations</div></div>
+        <div class="stat-box"><div class="stat-val" id="stat-comparisons">0</div><div class="stat-lbl">Comparisons</div></div>
+        <div class="stat-box"><div class="stat-val" id="stat-processed">0</div><div class="stat-lbl">Processed</div></div>
+      </div>
+    </div>
+
+    <!-- Distance Table -->
+    <div class="card">
+      <div class="card-title">Distance Table</div>
+      <table id="dist-table">
+        <thead><tr><th>Node</th><th>Distance</th><th>Via</th></tr></thead>
+        <tbody id="dist-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Priority Queue -->
+    <div class="card">
+      <div class="card-title">Priority Queue (Min-Heap)</div>
+      <div id="pq-list"><span style="color:var(--muted);font-size:12px;">–</span></div>
+    </div>
+
+    <!-- History -->
+    <div class="card">
+      <div class="card-title">Step History</div>
+      <div id="history-wrap">
+        <table id="history-table">
+          <thead><tr><th>#</th><th>Action</th><th>Node</th><th>Dist</th></tr></thead>
+          <tbody id="history-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ═══ RIGHT PANEL ═══════════════════════════════════════════ -->
+  <main id="right-panel">
+
+    <!-- Tab bar -->
+    <div id="tab-bar">
+      <button class="tab-btn active" data-tab="viz">Graph Visualization</button>
+      <button class="tab-btn" data-tab="clo1">CLO-1: Complexity Analysis</button>
+      <button class="tab-btn" data-tab="clo2">CLO-2: Priority Queue</button>
+      <button class="tab-btn" data-tab="clo3">CLO-3: Greedy Paradigm</button>
+      <button class="tab-btn" data-tab="edu">📚 Learn</button>
+    </div>
+
+    <!-- ── TAB 1: Graph Visualization ── -->
+    <div class="tab-panel active" id="tab-viz">
+
+      <!-- Legend -->
+      <div id="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#4f8ef7;border-color:#4f8ef7"></div> Source</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f7c948;border-color:#f7c948"></div> Current</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#3ecf8e;border-color:#3ecf8e"></div> Visited</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#22263a;border-color:#f76f6f"></div> In Queue</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#22263a;border-color:#a78bfa"></div> Unvisited</div>
+        <div class="legend-item" style="margin-left:auto;">
+          <div style="width:28px;height:3px;background:#f7c948;border-radius:2px"></div> Relaxing
+        </div>
+        <div class="legend-item">
+          <div style="width:28px;height:3px;background:#3ecf8e;border-radius:2px"></div> Shortest path
+        </div>
+      </div>
+
+      <!-- Main SVG visualization -->
+      <div id="viz-container">
+        <svg id="graph-svg"></svg>
+      </div>
+
+      <!-- Bottom: Pseudocode + Explanation -->
+      <div id="bottom-panels">
+        <div id="pseudocode-panel">
+          <div id="pseudocode-title">Pseudocode</div>
+          <div id="pseudocode-lines"></div>
+        </div>
+        <div id="explanation-panel">
+          <div id="explanation-title">Step Explanation</div>
+          <div id="explanation-text">Load a graph and click <strong>Build Steps</strong> to start.</div>
+        </div>
+      </div>
+
+    </div><!-- /tab-viz -->
+
+    <!-- ── TAB 2: CLO-1 Complexity Analysis ── -->
+    <div class="tab-panel" id="tab-clo1">
+      <div id="clo1-panel">
+
+        <!-- Complexity cards -->
+        <div class="complexity-cards">
+          <div class="complexity-card">
+            <div class="cx-val">O((V+E) log V)</div>
+            <div class="cx-label">Time – Binary Heap</div>
+            <div class="cx-note">Each vertex extracted once (V × log V) + each edge relaxed once (E × log V)</div>
+          </div>
+          <div class="complexity-card">
+            <div class="cx-val">O(V²)</div>
+            <div class="cx-label">Time – Simple Array</div>
+            <div class="cx-note">Linear scan to find minimum: V×V comparisons. Better for dense graphs (E ≈ V²)</div>
+          </div>
+          <div class="complexity-card">
+            <div class="cx-val">O(V + E)</div>
+            <div class="cx-label">Space Complexity</div>
+            <div class="cx-note">Stores dist[], prev[], and the priority queue (at most V entries)</div>
+          </div>
+          <div class="complexity-card">
+            <div class="cx-val">O(VE)</div>
+            <div class="cx-label">Bellman-Ford Time</div>
+            <div class="cx-note">Relaxes all E edges V-1 times. Handles negative weights but is much slower</div>
+          </div>
+        </div>
+
+        <!-- Growth chart -->
+        <div id="growth-chart-wrap">
+          <div id="growth-chart-title">Operation Growth Curves</div>
+          <div id="growth-chart-sub">Simulated operation counts as graph size (V) increases, assuming E ≈ 3V (sparse graph)</div>
+          <div id="growth-chart-controls">
+            <label>Max V =</label>
+            <input type="range" id="n-slider" min="10" max="200" step="5" value="100" style="width:160px" />
+            <span id="n-label">100</span>
+            <div class="chart-legend" style="margin-left:auto;">
+              <div class="chart-legend-item"><div class="chart-legend-swatch" style="background:#4f8ef7"></div>Dijkstra (heap)</div>
+              <div class="chart-legend-item"><div class="chart-legend-swatch" style="background:#f7c948"></div>Dijkstra (array)</div>
+              <div class="chart-legend-item"><div class="chart-legend-swatch" style="background:#f76f6f"></div>Bellman-Ford</div>
+              <div class="chart-legend-item"><div class="chart-legend-swatch" style="background:#3ecf8e; opacity:.5"></div>Theoretical O((V+E)logV)</div>
+            </div>
+          </div>
+          <svg id="growth-svg" height="260"></svg>
+        </div>
+
+        <!-- Worst-case -->
+        <div id="worst-wrap">
+          <h3>⚠ Worst-Case Scenario</h3>
+          <div class="worst-body">
+            <p>For Dijkstra with a binary min-heap, the worst case is a <span class="hl">complete graph</span> where:</p>
+            <ul style="margin: 8px 0 8px 20px; line-height:2;">
+              <li>Every vertex connects to every other: <span class="hl">E = V(V-1)</span></li>
+              <li>Every edge triggers a DECREASE-KEY: <span class="hl">E log V</span> heap operations</li>
+              <li>All V vertices are extracted from the heap: <span class="hl">V log V</span> extractions</li>
+            </ul>
+            <p>Total: <span class="hl">O((V + E) log V) = O(V² log V)</span> for a complete graph.</p>
+            <p style="margin-top:8px;">For such dense graphs the <span class="hl">O(V²) array implementation is actually faster</span>, since log V &gt; 1 and E ≈ V².</p>
+            <p style="margin-top:8px; color:var(--muted);">→ Load the <strong>Dense 6-node</strong> preset on the Graph tab to see a high-density example.</p>
+          </div>
+        </div>
+
+        <!-- Negative weights failure -->
+        <div id="neg-demo-wrap">
+          <div class="neg-demo-title">⛔ Why Dijkstra Fails with Negative Weights</div>
+          <div class="neg-demo-body">
+            <p>Dijkstra's <strong>greedy guarantee</strong> is: <em>"Once a node is extracted from the priority queue, its distance is final."</em></p>
+            <p style="margin-top:8px;">This holds <span class="ok">only if all edge weights are ≥ 0</span>. Here's why it breaks:</p>
+
+            <div style="margin:12px 0; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:12px; font-family:var(--mono); font-size:12px; line-height:2;">
+              Graph: &nbsp;<span class="node">A</span> →<sup>4</sup> <span class="node">B</span> →<sup>3</sup> <span class="node">D</span><br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="node">A</span> →<sup>2</sup> <span class="node">C</span> →<sup style="color:var(--red)">-5</sup> <span class="node">B</span>
+            </div>
+
+            <p><strong>Dijkstra's steps:</strong></p>
+            <ol style="margin: 8px 0 8px 20px; line-height:2;">
+              <li>Extract <span class="node">A</span> (dist=0). Relax: dist[B]=4, dist[C]=2.</li>
+              <li>Extract <span class="node">C</span> (dist=2). Relax: dist[B] = 2+(-5) = <span class="hl">-3</span>. But <span class="node">B</span> may already be finalized!</li>
+              <li>If <span class="node">B</span> was extracted at dist=4 <em>before</em> <span class="node">C</span> was processed, we <span class="hl">miss the true shortest path</span> dist[B]=<span class="ok">-3</span>.</li>
+            </ol>
+
+            <p><strong>Fix:</strong> Use <span class="ok">Bellman-Ford</span>, which relaxes all edges V-1 times, catching negative-weight updates regardless of order. It runs in <code>O(VE)</code> instead of <code>O((V+E) log V)</code>.</p>
+            <p style="margin-top:8px; color:var(--muted);">→ Load the <strong>Negative weights ⚠</strong> preset on the Graph tab to see this failure in action.</p>
+          </div>
+        </div>
+
+        <!-- Algorithm comparison table -->
+        <div id="compare-wrap">
+          <h3>Algorithm Comparison</h3>
+          <table id="compare-table">
+            <thead>
+              <tr>
+                <th>Algorithm</th>
+                <th>Time Complexity</th>
+                <th>Negative Weights</th>
+                <th>Paradigm</th>
+                <th>Best For</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Dijkstra (Heap)</td>
+                <td class="cell-good">O((V+E) log V)</td>
+                <td class="cell-bad">✗ No</td>
+                <td>Greedy</td>
+                <td>Sparse graphs, non-negative weights</td>
+              </tr>
+              <tr>
+                <td>Dijkstra (Array)</td>
+                <td class="cell-warn">O(V²)</td>
+                <td class="cell-bad">✗ No</td>
+                <td>Greedy</td>
+                <td>Dense graphs (E ≈ V²)</td>
+              </tr>
+              <tr>
+                <td>Bellman-Ford</td>
+                <td class="cell-bad">O(VE)</td>
+                <td class="cell-good">✓ Yes</td>
+                <td>Dynamic Programming</td>
+                <td>Graphs with negative weights</td>
+              </tr>
+              <tr>
+                <td>Floyd-Warshall</td>
+                <td class="cell-bad">O(V³)</td>
+                <td class="cell-good">✓ Yes</td>
+                <td>Dynamic Programming</td>
+                <td>All-pairs shortest paths</td>
+              </tr>
+              <tr>
+                <td>A* Search</td>
+                <td class="cell-good">O(E log V)*</td>
+                <td class="cell-bad">✗ No</td>
+                <td>Heuristic / Greedy</td>
+                <td>Single-target with a good heuristic</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="margin-top:8px;font-size:11px;color:var(--muted);">* A* complexity depends on the heuristic quality.</p>
+        </div>
+
+      </div>
+    </div><!-- /tab-clo1 -->
+
+    <!-- ── TAB 3: CLO-2 Priority Queue ── -->
+    <div class="tab-panel" id="tab-clo2">
+      <div id="clo2-panel">
+
+        <!-- Concept cards -->
+        <div class="pq-concept-cards">
+          <div class="pq-concept-card">
+            <div class="pcc-title">INSERT</div>
+            <div class="pcc-body">Add a new (node, distance) pair to the heap. Bubble up to restore the min-heap property.</div>
+            <div class="pcc-complexity">O(log V)</div>
+          </div>
+          <div class="pq-concept-card">
+            <div class="pcc-title">EXTRACT-MIN</div>
+            <div class="pcc-body">Remove the root (minimum distance node). Replace with last element, then sift down.</div>
+            <div class="pcc-complexity">O(log V)</div>
+          </div>
+          <div class="pq-concept-card">
+            <div class="pcc-title">DECREASE-KEY</div>
+            <div class="pcc-body">When a shorter path is found, update a node's distance. Bubble up to restore heap order.</div>
+            <div class="pcc-complexity">O(log V)</div>
+          </div>
+          <div class="pq-concept-card">
+            <div class="pcc-title">Role in Dijkstra</div>
+            <div class="pcc-body">The PQ always gives the unvisited node with smallest distance — this is the greedy choice. Without it, finding the min takes O(V) per step → O(V²) total.</div>
+            <div class="pcc-complexity">V×EXTRACT + E×DECREASE-KEY</div>
+          </div>
+        </div>
+
+        <!-- Interactive heap demo -->
+        <div id="heap-demo-wrap">
+          <h3>Interactive Heap Visualizer</h3>
+          <div id="heap-demo-sub">Watch the min-heap tree and its underlying array representation as operations execute step by step.</div>
+          <div id="heap-controls">
+            <button class="btn btn-primary btn-sm" id="btn-heap-build">Build Heap</button>
+            <button class="btn btn-warning btn-sm" id="btn-heap-extract" disabled>Extract-Min</button>
+            <button class="btn btn-neutral btn-sm" id="btn-heap-reset">Reset</button>
+            <span id="heap-op-label">Click "Build Heap" to start</span>
+          </div>
+          <div id="heap-svg-wrap">
+            <svg id="heap-svg" height="200"></svg>
+          </div>
+          <div style="margin-top:10px;">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;">Array Representation (0-indexed)</div>
+            <div id="array-view"></div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.7;">
+            <strong style="color:var(--text)">Heap property:</strong> Every parent's distance ≤ its children's distances. The root is always the minimum.
+            <br><strong style="color:var(--yellow)">Yellow = minimum (root)</strong> &nbsp;·&nbsp; <strong style="color:var(--orange)">Orange = recently updated (DECREASE-KEY)</strong>
+          </div>
+        </div>
+
+        <!-- PQ trace from last Dijkstra run -->
+        <div id="pq-trace-wrap">
+          <h3>Priority Queue Operation Trace</h3>
+          <div id="pq-trace-list">
+            <div style="color:var(--muted);font-size:12px;padding:8px;">Run Dijkstra on the Graph tab first, then come back here to see the full PQ operation log.</div>
+          </div>
+        </div>
+
+        <!-- Impact analysis -->
+        <div id="impact-wrap">
+          <h3>⚠ What Happens Without a Priority Queue?</h3>
+          <div class="impact-scenario">
+            <div class="impact-scenario-title">Scenario 1: Replace PQ with a simple unsorted array</div>
+            <div class="impact-scenario-body">
+              Instead of <code>EXTRACT-MIN</code> in O(log V), we scan all unvisited nodes linearly: <span class="bad">O(V)</span> per step.<br>
+              Total: <span class="bad">O(V²)</span> instead of <span class="good">O((V+E) log V)</span>.<br>
+              For a graph with 1000 nodes and 3000 edges: heap = ~33,000 ops vs array = ~1,000,000 ops. <span class="bad">30× slower.</span>
+            </div>
+          </div>
+          <div class="impact-scenario">
+            <div class="impact-scenario-title">Scenario 2: Remove the PQ entirely (process nodes in arbitrary order)</div>
+            <div class="impact-scenario-body">
+              Without always picking the <em>closest</em> unvisited node, the greedy-choice property <span class="bad">breaks</span>.<br>
+              A node might be processed with a non-optimal distance, then its neighbors get wrong values propagated.<br>
+              The result: <span class="bad">incorrect shortest paths</span> — the algorithm is no longer Dijkstra at all.
+            </div>
+          </div>
+          <div class="impact-scenario">
+            <div class="impact-scenario-title">Scenario 3: Use a max-heap instead of min-heap</div>
+            <div class="impact-scenario-body">
+              <code>EXTRACT-MAX</code> always picks the <em>farthest</em> unvisited node first.<br>
+              This explores the worst paths first, leading to <span class="bad">incorrect distance updates</span>. Shorter paths through closer nodes are never explored early enough to improve longer ones.<br>
+              This is equivalent to running BFS backwards in terms of priority.
+            </div>
+          </div>
+          <div class="impact-scenario">
+            <div class="impact-scenario-title">Summary: Why EXTRACT-MIN + DECREASE-KEY are critical</div>
+            <div class="impact-scenario-body">
+              <strong style="color:var(--green)">EXTRACT-MIN</strong> enforces the greedy choice — process closest node first.<br>
+              <strong style="color:var(--orange)">DECREASE-KEY</strong> ensures the PQ reflects updated (shorter) distances found during relaxation.<br>
+              Together they guarantee: when a node is extracted, its distance is <span class="good">provably optimal</span>.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /tab-clo2 -->
+
+    <!-- ── TAB 4: CLO-3 Greedy Paradigm ── -->
+    <div class="tab-panel" id="tab-clo3">
+      <div id="clo3-panel">
+
+        <!-- Paradigm label -->
+        <div id="greedy-badge-row">
+          <div class="paradigm-badge greedy">✓ Greedy Algorithm</div>
+          <div class="paradigm-desc">
+            Dijkstra is <strong>greedy</strong>: at every step it commits to the globally unvisited vertex with
+            the smallest known distance, without reconsidering past choices. This works because
+            <strong>non-negative edge weights guarantee that no future path can improve an already-finalized node.</strong>
+          </div>
+        </div>
+
+        <!-- Animated greedy step explorer -->
+        <div id="greedy-anim-wrap">
+          <h3>Greedy Choice Animator</h3>
+          <div id="greedy-anim-sub">Step through the greedy choices Dijkstra makes. Each step picks the closest unvisited node — this is the greedy decision.</div>
+          <div id="greedy-anim-controls">
+            <button class="btn btn-primary btn-sm"  id="btn-greedy-build">Build</button>
+            <button class="btn btn-neutral btn-sm"  id="btn-greedy-prev"  disabled>← Prev</button>
+            <button class="btn btn-success btn-sm"  id="btn-greedy-next"  disabled>Next →</button>
+            <button class="btn btn-danger  btn-sm"  id="btn-greedy-reset">Reset</button>
+            <span id="greedy-step-box">Click "Build" to animate greedy choices on the Classic 7-node graph.</span>
+          </div>
+          <div id="greedy-svg-wrap">
+            <svg id="greedy-svg" height="290"></svg>
+          </div>
+          <div style="margin-top:10px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:6px;">Greedy Choices Made</div>
+            <div id="greedy-choice-list"></div>
+          </div>
+        </div>
+
+        <!-- Proof of greedy correctness -->
+        <div id="proof-wrap">
+          <h3>Proof: Why the Greedy Choice is Always Correct</h3>
+          <div class="proof-body">
+            <p><span class="thm">Theorem (Dijkstra's Correctness):</span> When a vertex u is extracted from the priority queue, dist[u] is the true shortest-path distance from the source.</p>
+            <br>
+            <p><span class="key">Proof by contradiction:</span></p>
+            <div class="proof-step"><span class="proof-step-num">1</span><span>Suppose u is extracted with dist[u] = d, but the true shortest distance is d* &lt; d.</span></div>
+            <div class="proof-step"><span class="proof-step-num">2</span><span>There must exist an alternative path s → … → x → y → … → u with total weight d*.</span></div>
+            <div class="proof-step"><span class="proof-step-num">3</span><span>Let x be the last visited node on this path, and y the first unvisited node. Since dist[x] is final, dist[y] ≤ dist[x] + w(x,y) ≤ d* &lt; d.</span></div>
+            <div class="proof-step"><span class="proof-step-num">4</span><span>But then dist[y] &lt; dist[u], so the priority queue would have extracted y before u — contradiction! u cannot have been extracted first.</span></div>
+            <div class="proof-step"><span class="proof-step-num">5</span><span><strong style="color:var(--green)">Therefore dist[u] = d* — the greedy choice is always optimal.</strong> This relies on all edge weights ≥ 0 (step 3 requires w(x,y) ≥ 0).</span></div>
+          </div>
+        </div>
+
+        <!-- Side-by-side: Dijkstra vs Bellman-Ford -->
+        <div id="bf-compare-wrap">
+          <h3>Greedy (Dijkstra) vs Dynamic Programming (Bellman-Ford)</h3>
+          <div id="bf-run-controls">
+            <button class="btn btn-primary btn-sm"  id="btn-bf-run">Run Both Algorithms</button>
+            <button class="btn btn-danger  btn-sm"  id="btn-bf-neg">Use Negative-Weight Graph</button>
+            <span style="font-size:11px;color:var(--muted)">Compare results on the same graph side by side</span>
+          </div>
+          <div id="bf-side-by-side">
+            <div class="algo-column dijkstra">
+              <div class="algo-column-title">Dijkstra (Greedy) — O((V+E) log V)</div>
+              <div class="algo-trace-list" id="dijk-trace"></div>
+            </div>
+            <div class="algo-column bellman">
+              <div class="algo-column-title">Bellman-Ford (DP) — O(VE)</div>
+              <div class="algo-trace-list" id="bf-trace"></div>
+            </div>
+          </div>
+          <div id="bf-verdict"></div>
+        </div>
+
+        <!-- Counterexample with negative weights -->
+        <div id="counter-wrap">
+          <h3>⛔ Counterexample: When Greedy Fails</h3>
+          <div class="counter-body">
+            <p>On a graph with a <span class="bad">negative-weight edge</span>, the greedy assumption breaks.
+            Dijkstra finalizes a node too early — before discovering a cheaper path through the negative edge.</p>
+            <div id="counter-svg-wrap">
+              <svg id="counter-svg" width="460" height="160"></svg>
+            </div>
+            <p><strong>Graph:</strong> <span class="node">A</span> →<sup>4</sup> <span class="node">B</span>,&nbsp;
+               <span class="node">A</span> →<sup>2</sup> <span class="node">C</span>,&nbsp;
+               <span class="node">C</span> →<sup style="color:var(--red)">−5</sup> <span class="node">B</span></p>
+            <br>
+            <p><strong>Dijkstra (wrong):</strong></p>
+            <ol style="margin:6px 0 6px 20px;line-height:2.2;">
+              <li>Extract <span class="node">A</span> (d=0). Set dist[B]=4, dist[C]=2.</li>
+              <li>Extract <span class="node">C</span> (d=2). Relax: dist[B] = 2+(−5) = <span class="good">−3</span>. Update dist[B].</li>
+              <li>Extract <span class="node">B</span> (d=−3). ← Dijkstra may report <span class="bad">dist[B]=4</span> if B was finalized in step 1 before C relaxed it!</li>
+            </ol>
+            <p>The issue: if dist[B]=4 was already finalized (extracted) before C was processed, the update to −3 comes <span class="bad">too late</span>.</p>
+            <br>
+            <p><strong>Bellman-Ford (correct):</strong> Runs V−1 full relaxation passes. In pass 2 it re-relaxes B via C, correctly finding <span class="good">dist[B] = −3</span>. Dynamic Programming does not commit early — it re-examines everything.</p>
+          </div>
+        </div>
+
+        <!-- Paradigm comparison summary -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;">
+          <h3 style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;">Greedy vs DP vs Divide & Conquer — Key Differences</h3>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr>
+                <th style="background:var(--bg);color:var(--muted);font-weight:700;padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Property</th>
+                <th style="background:var(--bg);color:var(--green);font-weight:700;padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Greedy (Dijkstra)</th>
+                <th style="background:var(--bg);color:var(--purple);font-weight:700;padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">DP (Bellman-Ford)</th>
+                <th style="background:var(--bg);color:var(--accent);font-weight:700;padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">D&C (Merge Sort)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:7px 10px;border-bottom:1px solid var(--border);color:var(--muted)">Decision style</td><td style="padding:7px 10px;border-bottom:1px solid var(--border)">Commit once, never revisit</td><td style="padding:7px 10px;border-bottom:1px solid var(--border)">Build table, revisit all</td><td style="padding:7px 10px;border-bottom:1px solid var(--border)">Split, solve, merge</td></tr>
+              <tr><td style="padding:7px 10px;border-bottom:1px solid var(--border);color:var(--muted)">Overlapping subproblems</td><td style="padding:7px 10px;border-bottom:1px solid var(--border)">Not exploited</td><td style="padding:7px 10px;border-bottom:1px solid var(--border)">Explicitly reused</td><td style="padding:7px 10px;border-bottom:1px solid var(--border)">Avoided (independent)</td></tr>
+              <tr><td style="padding:7px 10px;border-bottom:1px solid var(--border);color:var(--muted)">Negative edges</td><td style="padding:7px 10px;border-bottom:1px solid var(--border);color:var(--red)">✗ Fails</td><td style="padding:7px 10px;border-bottom:1px solid var(--border);color:var(--green)">✓ Handles</td><td style="padding:7px 10px;border-bottom:1px solid var(--border);color:var(--muted)">N/A</td></tr>
+              <tr><td style="padding:7px 10px;border-bottom:1px solid var(--border);color:var(--muted)">Speed</td><td style="padding:7px 10px;border-bottom:1px solid var(--border);color:var(--green)">Faster (when valid)</td><td style="padding:7px 10px;border-bottom:1px solid var(--border);color:var(--yellow)">Slower but general</td><td style="padding:7px 10px;border-bottom:1px solid var(--border)">Problem-dependent</td></tr>
+              <tr><td style="padding:7px 10px;color:var(--muted)">Correctness guarantee</td><td style="padding:7px 10px">Greedy-choice property</td><td style="padding:7px 10px">Optimal substructure</td><td style="padding:7px 10px">Conquer + combine</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div><!-- /tab-clo3 -->
+
+    <!-- ── TAB 5: Educational Content ── -->
+    <div class="tab-panel" id="tab-edu">
+      <div id="edu-panel">
+
+        <!-- Quick reference bar -->
+        <div class="quick-ref">
+          <div class="quick-ref-row">
+            <div class="qr-item"><span class="qr-label">Algorithm:</span><span class="qr-val">Dijkstra's SSSP</span></div>
+            <div class="qr-item"><span class="qr-label">Paradigm:</span><span class="qr-val">Greedy</span></div>
+            <div class="qr-item"><span class="qr-label">Time (heap):</span><span class="qr-val">O((V+E) log V)</span></div>
+            <div class="qr-item"><span class="qr-label">Space:</span><span class="qr-val">O(V + E)</span></div>
+            <div class="qr-item"><span class="qr-label">Negative weights:</span><span class="qr-val" style="color:var(--red)">✗ Not allowed</span></div>
+            <div class="qr-item"><span class="qr-label">Year:</span><span class="qr-val">1956 (E.W. Dijkstra)</span></div>
+          </div>
+        </div>
+
+        <!-- 1. Overview -->
+        <div class="collapsible open" id="col-overview">
+          <div class="collapsible-header" onclick="toggleCollapsible('col-overview')">
+            <div class="collapsible-title"><span>🗺</span> Overview — What is Dijkstra's Algorithm?</div>
+            <span class="collapsible-icon">▼</span>
+          </div>
+          <div class="collapsible-body edu-section">
+            <div class="collapsible-scroll">
+            <p>Dijkstra's algorithm, published by Dutch computer scientist <strong>Edsger W. Dijkstra in 1956</strong>, solves the <strong>Single-Source Shortest Path (SSSP)</strong> problem: given a weighted graph and a source vertex, find the shortest path from the source to every other vertex.</p>
+
+            <h4>What problem does it solve?</h4>
+            <ul>
+              <li>Navigation apps (Google Maps, GPS routing)</li>
+              <li>Network routing protocols (OSPF uses Dijkstra)</li>
+              <li>Game AI pathfinding (finding optimal routes on a map)</li>
+              <li>Social network analysis (shortest connection between people)</li>
+              <li>Airline route optimization</li>
+            </ul>
+
+            <h4>How does it work? (Plain English)</h4>
+            <ol>
+              <li>Start at the source node. Set its distance to <strong>0</strong>. Set all others to <strong>infinity (unknown)</strong>.</li>
+              <li>Put all nodes in a priority queue ordered by their current distance.</li>
+              <li>Repeatedly <strong>pick the closest unvisited node</strong> (greedy choice).</li>
+              <li>For each of its neighbors, check: <em>"Is going through this node shorter than what we know?"</em> If yes, update the neighbor's distance (relaxation).</li>
+              <li>Mark the node as visited — its distance is now <strong>final and optimal</strong>.</li>
+              <li>Repeat until all nodes are visited or the queue is empty.</li>
+            </ol>
+
+            <h4>When should you use it?</h4>
+            <ul>
+              <li><strong>Use Dijkstra</strong> when: all edge weights are non-negative, you need single-source shortest paths, and speed matters.</li>
+              <li><strong>Use Bellman-Ford</strong> when: the graph may contain negative-weight edges.</li>
+              <li><strong>Use Floyd-Warshall</strong> when: you need all-pairs shortest paths.</li>
+              <li><strong>Use A*</strong> when: you have a single target and a good distance heuristic (e.g., Euclidean distance).</li>
+            </ul>
+
+            <h4>Key Requirement</h4>
+            <p>All edge weights must be <strong>≥ 0</strong>. With negative weights, the greedy property breaks — a seemingly finalized node can later be improved via a negative edge, making previously calculated distances wrong.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Worked Example -->
+        <div class="collapsible open" id="col-worked">
+          <div class="collapsible-header" onclick="toggleCollapsible('col-worked')">
+            <div class="collapsible-title"><span>✏️</span> Worked Example — Step by Step</div>
+            <span class="collapsible-icon">▼</span>
+          </div>
+          <div class="collapsible-body edu-section">
+            <div class="collapsible-scroll">
+            <p>We trace Dijkstra on the <strong>Simple 5-node graph</strong> (Preset 1) with source <code>A</code>:</p>
+            <p>Edges: <code>A→B:4, A→C:2, B→C:1, B→D:5, C→D:8, C→E:10, D→E:2</code></p>
+
+            <!-- Step 0 -->
+            <div class="worked-step">
+              <div class="worked-step-num">0</div>
+              <div class="worked-step-body">
+                <strong>Initialization</strong><br>
+                Set <span class="ws-node">dist[A]=0</span>, all others = ∞. Insert all nodes into the priority queue.
+                <div class="table-scroll"><table class="worked-step-table">
+                  <thead><tr><th>Node</th><th>Distance</th><th>Via</th><th>Status</th></tr></thead>
+                  <tbody>
+                    <tr class="wt-current"><td>A</td><td>0</td><td>–</td><td>In PQ (min)</td></tr>
+                    <tr><td>B</td><td>∞</td><td>–</td><td>In PQ</td></tr>
+                    <tr><td>C</td><td>∞</td><td>–</td><td>In PQ</td></tr>
+                    <tr><td>D</td><td>∞</td><td>–</td><td>In PQ</td></tr>
+                    <tr><td>E</td><td>∞</td><td>–</td><td>In PQ</td></tr>
+                  </tbody>
+                </table></div>
+              </div>
+            </div>
+
+            <!-- Step 1 -->
+            <div class="worked-step">
+              <div class="worked-step-num">1</div>
+              <div class="worked-step-body">
+                <span class="ws-pick">EXTRACT-MIN → A (dist=0)</span><br>
+                Greedy choice: <span class="ws-node">A</span> has the smallest distance. Finalize it.<br>
+                Relax neighbors:
+                <ul>
+                  <li><span class="ws-edge">A→B (w=4):</span> dist[B] = 0+4 = <span class="ws-dist">4</span> &lt; ∞ → update</li>
+                  <li><span class="ws-edge">A→C (w=2):</span> dist[C] = 0+2 = <span class="ws-dist">2</span> &lt; ∞ → update</li>
+                </ul>
+                <div class="table-scroll"><table class="worked-step-table">
+                  <thead><tr><th>Node</th><th>Distance</th><th>Via</th><th>Status</th></tr></thead>
+                  <tbody>
+                    <tr class="wt-visited"><td>A</td><td>0</td><td>–</td><td>✓ Finalized</td></tr>
+                    <tr class="wt-updated"><td>B</td><td>4</td><td>A</td><td>In PQ</td></tr>
+                    <tr class="wt-updated"><td>C</td><td>2</td><td>A</td><td>In PQ (min)</td></tr>
+                    <tr><td>D</td><td>∞</td><td>–</td><td>In PQ</td></tr>
+                    <tr><td>E</td><td>∞</td><td>–</td><td>In PQ</td></tr>
+                  </tbody>
+                </table></div>
+              </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="worked-step">
+              <div class="worked-step-num">2</div>
+              <div class="worked-step-body">
+                <span class="ws-pick">EXTRACT-MIN → C (dist=2)</span><br>
+                Finalize <span class="ws-node">C</span>. Relax neighbors:
+                <ul>
+                  <li><span class="ws-edge">C→D (w=8):</span> dist[D] = 2+8 = <span class="ws-dist">10</span> &lt; ∞ → update</li>
+                  <li><span class="ws-edge">C→E (w=10):</span> dist[E] = 2+10 = <span class="ws-dist">12</span> &lt; ∞ → update</li>
+                </ul>
+                <div class="table-scroll"><table class="worked-step-table">
+                  <thead><tr><th>Node</th><th>Distance</th><th>Via</th><th>Status</th></tr></thead>
+                  <tbody>
+                    <tr class="wt-visited"><td>A</td><td>0</td><td>–</td><td>✓ Finalized</td></tr>
+                    <tr class="wt-current"><td>B</td><td>4</td><td>A</td><td>In PQ (min)</td></tr>
+                    <tr class="wt-visited"><td>C</td><td>2</td><td>A</td><td>✓ Finalized</td></tr>
+                    <tr class="wt-updated"><td>D</td><td>10</td><td>C</td><td>In PQ</td></tr>
+                    <tr class="wt-updated"><td>E</td><td>12</td><td>C</td><td>In PQ</td></tr>
+                  </tbody>
+                </table></div>
+              </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="worked-step">
+              <div class="worked-step-num">3</div>
+              <div class="worked-step-body">
+                <span class="ws-pick">EXTRACT-MIN → B (dist=4)</span><br>
+                Finalize <span class="ws-node">B</span>. Relax neighbors:
+                <ul>
+                  <li><span class="ws-edge">B→C (w=1):</span> 4+1=5 ≥ dist[C]=2 → <strong>no update</strong> (C already finalized)</li>
+                  <li><span class="ws-edge">B→D (w=5):</span> 4+5=9 &lt; dist[D]=10 → update dist[D] = <span class="ws-dist">9</span> via B</li>
+                </ul>
+                <div class="table-scroll"><table class="worked-step-table">
+                  <thead><tr><th>Node</th><th>Distance</th><th>Via</th><th>Status</th></tr></thead>
+                  <tbody>
+                    <tr class="wt-visited"><td>A</td><td>0</td><td>–</td><td>✓ Finalized</td></tr>
+                    <tr class="wt-visited"><td>B</td><td>4</td><td>A</td><td>✓ Finalized</td></tr>
+                    <tr class="wt-visited"><td>C</td><td>2</td><td>A</td><td>✓ Finalized</td></tr>
+                    <tr class="wt-updated wt-current"><td>D</td><td>9</td><td>B</td><td>In PQ (min)</td></tr>
+                    <tr><td>E</td><td>12</td><td>C</td><td>In PQ</td></tr>
+                  </tbody>
+                </table></div>
+              </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="worked-step">
+              <div class="worked-step-num">4</div>
+              <div class="worked-step-body">
+                <span class="ws-pick">EXTRACT-MIN → D (dist=9)</span><br>
+                Finalize <span class="ws-node">D</span>. Relax neighbors:
+                <ul>
+                  <li><span class="ws-edge">D→E (w=2):</span> 9+2=11 &lt; dist[E]=12 → update dist[E] = <span class="ws-dist">11</span> via D</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Step 5 -->
+            <div class="worked-step">
+              <div class="worked-step-num">5</div>
+              <div class="worked-step-body">
+                <span class="ws-pick">EXTRACT-MIN → E (dist=11)</span><br>
+                Finalize <span class="ws-node">E</span>. No unvisited neighbors. Queue is empty.
+                <div class="table-scroll"><table class="worked-step-table">
+                  <thead><tr><th>Node</th><th>Final Distance</th><th>Shortest Path</th></tr></thead>
+                  <tbody>
+                    <tr class="wt-visited"><td>A</td><td>0</td><td>A</td></tr>
+                    <tr class="wt-visited"><td>B</td><td>4</td><td>A → B</td></tr>
+                    <tr class="wt-visited"><td>C</td><td>2</td><td>A → C</td></tr>
+                    <tr class="wt-visited"><td>D</td><td>9</td><td>A → B → D</td></tr>
+                    <tr class="wt-visited"><td>E</td><td>11</td><td>A → B → D → E</td></tr>
+                  </tbody>
+                </table></div>
+                <p style="margin-top:8px;color:var(--green);font-weight:700;">✓ All shortest paths found! Load "Simple 5-node" on the Graph tab and hit Play to see this animated.</p>
+              </div>
+            </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Key Concepts -->
+        <div class="collapsible open" id="col-concepts">
+          <div class="collapsible-header" onclick="toggleCollapsible('col-concepts')">
+            <div class="collapsible-title"><span>💡</span> Key Concepts</div>
+            <span class="collapsible-icon">▼</span>
+          </div>
+          <div class="collapsible-body">
+            <div class="collapsible-scroll">
+            <div class="concept-grid">
+              <div class="concept-box cb-blue">
+                <div class="concept-box-title">Edge Relaxation</div>
+                <div class="concept-box-body">For edge u→v with weight w: if dist[u]+w &lt; dist[v], update dist[v]. This is called <em>relaxing</em> the edge. Every shortest path is built by a sequence of successful relaxations.</div>
+              </div>
+              <div class="concept-box cb-green">
+                <div class="concept-box-title">Greedy Choice Property</div>
+                <div class="concept-box-body">The node extracted from the PQ always has its true shortest distance. No future path can improve it — because all remaining edges have non-negative weight, so future paths can only be equal or longer.</div>
+              </div>
+              <div class="concept-box cb-yellow">
+                <div class="concept-box-title">Optimal Substructure</div>
+                <div class="concept-box-body">Every sub-path of a shortest path is itself a shortest path. If A→B→C is the shortest path from A to C, then A→B must be the shortest path from A to B.</div>
+              </div>
+              <div class="concept-box cb-purple">
+                <div class="concept-box-title">Priority Queue Role</div>
+                <div class="concept-box-body">The min-heap always surfaces the globally cheapest unvisited node. This is what makes Dijkstra efficient — O(log V) per extraction instead of O(V) for a linear scan.</div>
+              </div>
+              <div class="concept-box cb-red">
+                <div class="concept-box-title">Negative Weights Break It</div>
+                <div class="concept-box-body">Once a node is finalized (extracted), Dijkstra never revisits it. A negative-weight edge discovered later could have produced a shorter path — but Dijkstra already committed. Bellman-Ford avoids this by relaxing all edges V−1 times.</div>
+              </div>
+              <div class="concept-box cb-blue">
+                <div class="concept-box-title">Path Reconstruction</div>
+                <div class="concept-box-body">The <code>prev[]</code> array records the predecessor of each node on the shortest path. To get the path to any node v: start at v, follow prev[v], prev[prev[v]], etc. back to the source.</div>
+              </div>
+            </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Common Mistakes -->
+        <div class="collapsible" id="col-mistakes">
+          <div class="collapsible-header" onclick="toggleCollapsible('col-mistakes')">
+            <div class="collapsible-title"><span>⚠️</span> Common Mistakes & Misconceptions</div>
+            <span class="collapsible-icon">▼</span>
+          </div>
+          <div class="collapsible-body">
+            <div class="collapsible-scroll">
+            <div class="mistake-list">
+              <div class="mistake-item">
+                <div class="mistake-icon">❌</div>
+                <div class="mistake-body">
+                  <strong>Mistake: Using Dijkstra on a graph with negative edges.</strong><br>
+                  Dijkstra finalizes distances as it goes. A negative edge encountered later can invalidate an already-finalized distance, but Dijkstra won't go back to fix it.<br>
+                  <span class="fix">Fix: Use Bellman-Ford for graphs with negative weights (but no negative cycles).</span>
+                </div>
+              </div>
+              <div class="mistake-item">
+                <div class="mistake-icon">❌</div>
+                <div class="mistake-body">
+                  <strong>Mistake: Thinking the shortest path uses the fewest edges.</strong><br>
+                  Dijkstra minimizes total weight, not hop count. A 3-hop path with total weight 5 beats a 1-hop path with weight 10.<br>
+                  <span class="fix">Fix: For minimum hops, use BFS (unweighted) or set all weights = 1.</span>
+                </div>
+              </div>
+              <div class="mistake-item">
+                <div class="mistake-icon">❌</div>
+                <div class="mistake-body">
+                  <strong>Mistake: Visiting a node more than once.</strong><br>
+                  Once a node is extracted from the PQ (finalized), its distance is optimal. Re-processing it wastes time and produces incorrect results in some implementations.<br>
+                  <span class="fix">Fix: Always check <code>if visited[u]: continue</code> before processing a node.</span>
+                </div>
+              </div>
+              <div class="mistake-item">
+                <div class="mistake-icon">❌</div>
+                <div class="mistake-body">
+                  <strong>Mistake: Confusing Dijkstra with BFS.</strong><br>
+                  BFS explores nodes level by level and works for unweighted shortest paths. Dijkstra uses a priority queue to always explore the cheapest node next — a different strategy.<br>
+                  <span class="fix">Fix: BFS = shortest path by hops; Dijkstra = shortest path by weight.</span>
+                </div>
+              </div>
+              <div class="mistake-item">
+                <div class="mistake-icon">❌</div>
+                <div class="mistake-body">
+                  <strong>Mistake: Forgetting to initialize dist[source] = 0.</strong><br>
+                  If source starts at ∞ like all other nodes, it will never be extracted first and the algorithm produces wrong results.<br>
+                  <span class="fix">Fix: Always set dist[source] = 0 before building the priority queue.</span>
+                </div>
+              </div>
+              <div class="mistake-item">
+                <div class="mistake-icon">❌</div>
+                <div class="mistake-body">
+                  <strong>Mistake: Using a max-heap instead of a min-heap.</strong><br>
+                  A max-heap extracts the farthest node first — the opposite of what Dijkstra needs. This produces completely wrong shortest paths.<br>
+                  <span class="fix">Fix: Always use a min-heap (minimum distance at the root / top).</span>
+                </div>
+              </div>
+            </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Algorithm Variants -->
+        <div class="collapsible" id="col-variants">
+          <div class="collapsible-header" onclick="toggleCollapsible('col-variants')">
+            <div class="collapsible-title"><span>🔀</span> Algorithm Variants & Extensions</div>
+            <span class="collapsible-icon">▼</span>
+          </div>
+          <div class="collapsible-body edu-section">
+            <div class="collapsible-scroll">
+            <h4>Dijkstra with different data structures</h4>
+            <ul>
+              <li><strong>Simple array:</strong> O(V²) time — best for dense graphs (E ≈ V²)</li>
+              <li><strong>Binary min-heap:</strong> O((V+E) log V) — best for sparse graphs</li>
+              <li><strong>Fibonacci heap:</strong> O(V log V + E) — theoretically optimal, rarely used in practice due to high constants</li>
+            </ul>
+
+            <h4>Bidirectional Dijkstra</h4>
+            <p>Run Dijkstra simultaneously from source AND target. Stop when the two frontiers meet. Roughly <strong>2× faster</strong> than standard Dijkstra for single-pair queries. Used in real GPS systems.</p>
+
+            <h4>A* Search</h4>
+            <p>Dijkstra extended with a <strong>heuristic function h(v)</strong> that estimates the remaining distance to the target. Uses priority = dist[v] + h(v) instead of just dist[v]. Explores fewer nodes when the heuristic is good (e.g., straight-line distance for geographic graphs).</p>
+
+            <h4>Johnson's Algorithm</h4>
+            <p>Handles negative weights by <strong>re-weighting</strong> edges to be non-negative (using Bellman-Ford once), then running Dijkstra from every vertex. Total: O(V² log V + VE) — better than V × Bellman-Ford for sparse graphs.</p>
+
+            <h4>SSSP on DAGs</h4>
+            <p>For <strong>Directed Acyclic Graphs</strong>, topological sort + single relaxation pass gives O(V+E) — faster than Dijkstra and works with negative weights.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /tab-edu -->
+
+  </main>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   DIJKSTRA VISUALIZER  –  Core Logic
+   ═══════════════════════════════════════════════════════════════ */
+
+// ─── Preset Graphs ─────────────────────────────────────────────
+const PRESETS = [
+  {
+    name: "Simple 5-node",
+    source: "A",
+    edges: [
+      ["A","B",4],["A","C",2],["B","C",1],["B","D",5],["C","D",8],["C","E",10],["D","E",2],
+    ],
+    layout: { A:[100,200], B:[260,100], C:[260,300], D:[420,100], E:[420,300] }
+  },
+  {
+    name: "Classic 7-node",
+    source: "S",
+    edges: [
+      ["S","A",3],["S","B",2],["A","C",4],["A","D",2],["B","D",5],["B","E",3],
+      ["C","F",1],["D","C",1],["D","F",4],["D","E",1],["E","F",2],
+    ],
+    layout: { S:[80,200], A:[220,100], B:[220,300], C:[380,80], D:[380,220], E:[380,340], F:[520,200] }
+  },
+  {
+    name: "Dense 6-node",
+    source: "A",
+    edges: [
+      ["A","B",7],["A","C",9],["A","F",14],["B","C",10],["B","D",15],
+      ["C","D",11],["C","F",2],["D","E",6],["E","F",9],
+    ],
+    layout: { A:[100,200], B:[240,100], C:[380,100], D:[480,240], E:[380,360], F:[180,340] }
+  },
+  {
+    name: "Negative weights ⚠",
+    source: "A",
+    edges: [
+      ["A","B",4],["A","C",2],["B","D",3],["C","B",-5],["C","D",8],
+    ],
+    layout: { A:[100,200], B:[280,100], C:[280,300], D:[460,200] }
+  }
+];
+
+// ─── Dijkstra Pseudocode ────────────────────────────────────────
+const PSEUDO = [
+  { text: "DIJKSTRA(G, w, s):",          tip: "Entry point: graph G, weight fn w, source s" },
+  { text: "  for each v ∈ G.V:",         tip: "Initialize all vertices in the graph" },
+  { text: "    dist[v] ← ∞",            tip: "Set initial distance to infinity (unknown)" },
+  { text: "    prev[v] ← NIL",           tip: "No predecessor yet" },
+  { text: "  dist[s] ← 0",              tip: "Distance from source to itself is 0" },
+  { text: "  Q ← BUILD-HEAP(G.V)",      tip: "Insert all vertices into the min-heap priority queue" },
+  { text: "  while Q ≠ ∅:",             tip: "Repeat until the queue is empty" },
+  { text: "    u ← EXTRACT-MIN(Q)",     tip: "Greedily pick vertex with smallest tentative distance" },
+  { text: "    for each v ∈ Adj[u]:",   tip: "Examine all neighbors of u" },
+  { text: "      alt ← dist[u] + w(u,v)",tip:"Compute candidate distance through u" },
+  { text: "      if alt < dist[v]:",    tip: "If this path is shorter than the known one…" },
+  { text: "        dist[v] ← alt",      tip: "Update (DECREASE-KEY) the shorter distance" },
+  { text: "        prev[v] ← u",        tip: "Record that we came from u" },
+  { text: "  return dist, prev",        tip: "Final shortest distances and predecessor map" },
+];
+
+// ─── State ─────────────────────────────────────────────────────
+let graph = { nodes: [], edges: [], adj: {}, layout: {} };
+let steps = [];
+let currentStep = -1;
+let playInterval = null;
+let speed = 1;
+let stats = { relaxations: 0, comparisons: 0, processed: 0 };
+let historyRows = [];
+
+// ─── DOM References ─────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const svg = $("graph-svg");
+
+// ─── Build Graph from edge list string ─────────────────────────
+function parseEdges(text) {
+  const edges = [];
+  const nodes = new Set();
+  for (const line of text.trim().split("\n")) {
+    const parts = line.trim().split(/\s+/);
+    if (parts.length < 3) continue;
+    const [u, v, w] = parts;
+    const weight = parseFloat(w);
+    if (isNaN(weight)) continue;
+    edges.push([u, v, weight]);
+    nodes.add(u); nodes.add(v);
+  }
+  return { edges, nodes: [...nodes] };
+}
+
+function buildGraph(edgesArr, nodesArr, layout) {
+  graph.nodes = nodesArr;
+  graph.edges = edgesArr;
+  graph.layout = layout || autoLayout(nodesArr, edgesArr);
+  graph.adj = {};
+  for (const n of nodesArr) graph.adj[n] = [];
+  for (const [u, v, w] of edgesArr) {
+    graph.adj[u].push({ to: v, w });
+    // undirected: also add reverse unless preset has it
+    // We'll keep directed for cleaner viz; user can add both directions
+  }
+}
+
+// ─── Auto-layout (circular) ─────────────────────────────────────
+function autoLayout(nodes, edges) {
+  const svgEl = $("viz-container");
+  const W = svgEl.offsetWidth || 600;
+  const H = svgEl.offsetHeight || 400;
+  const cx = W / 2, cy = H / 2;
+  const r = Math.min(W, H) * 0.36;
+  const layout = {};
+  nodes.forEach((n, i) => {
+    const angle = (2 * Math.PI * i / nodes.length) - Math.PI / 2;
+    layout[n] = [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
+  });
+  return layout;
+}
+
+// ─── Build shortest-path tree edges ────────────────────────────
+function getShortestPathEdges(prevMap) {
+  const set = new Set();
+  for (const [v, u] of Object.entries(prevMap)) {
+    if (u !== null) set.add(`${u}->${v}`);
+  }
+  return set;
+}
+
+// ─── Render SVG ────────────────────────────────────────────────
+function renderGraph(stepData) {
+  const W = svg.clientWidth || svg.parentElement.clientWidth || 600;
+  const H = svg.clientHeight || svg.parentElement.clientHeight || 400;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = "";
+
+  if (!graph.nodes.length) return;
+
+  const { dist, prev, visited, currentNode, relaxEdge, updatedNode, done } = stepData || {};
+  const spEdges = done && prev ? getShortestPathEdges(prev) : (prev ? getShortestPathEdges(prev) : new Set());
+
+  const layout = graph.layout;
+
+  // Draw edges
+  const edgeGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  for (const [u, v, w] of graph.edges) {
+    const [x1, y1] = layout[u];
+    const [x2, y2] = layout[v];
+
+    const isRelaxing = relaxEdge && relaxEdge[0] === u && relaxEdge[1] === v;
+    const isSP = spEdges.has(`${u}->${v}`);
+
+    // Arrow marker
+    const mid = `${u}-${v}`;
+    const markerId = `arrow-${mid.replace(/[^a-z0-9]/gi, "")}`;
+    const markerColor = isRelaxing ? "#f7c948" : isSP ? "#3ecf8e" : "#4a5080";
+    appendMarker(svg, markerId, markerColor);
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    // Shorten line to not overlap circle
+    const R = 22, dx = x2 - x1, dy = y2 - y1, len = Math.sqrt(dx*dx + dy*dy);
+    const ux = dx / len, uy = dy / len;
+    line.setAttribute("x1", x1 + ux * R);
+    line.setAttribute("y1", y1 + uy * R);
+    line.setAttribute("x2", x2 - ux * (R + 10));
+    line.setAttribute("y2", y2 - uy * (R + 10));
+    line.setAttribute("stroke", markerColor);
+    line.setAttribute("stroke-width", isRelaxing ? "3" : isSP ? "2.5" : "1.5");
+    line.setAttribute("marker-end", `url(#${markerId})`);
+    line.setAttribute("opacity", isRelaxing ? "1" : isSP ? "1" : "0.45");
+    line.style.transition = "stroke .25s, stroke-width .25s";
+    edgeGroup.appendChild(line);
+
+    // Weight label
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const perp = { x: -uy * 12, y: ux * 12 };
+    const wLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    wLabel.setAttribute("x", mx + perp.x);
+    wLabel.setAttribute("y", my + perp.y);
+    wLabel.setAttribute("fill", isRelaxing ? "#f7c948" : "#8892b0");
+    wLabel.setAttribute("font-size", "11");
+    wLabel.setAttribute("font-family", "Consolas, monospace");
+    wLabel.setAttribute("text-anchor", "middle");
+    wLabel.setAttribute("dominant-baseline", "central");
+    wLabel.textContent = w;
+    // Highlight negative weights
+    if (w < 0) {
+      wLabel.setAttribute("fill", "#f76f6f");
+      wLabel.setAttribute("font-weight", "700");
+    }
+    edgeGroup.appendChild(wLabel);
+  }
+  svg.appendChild(edgeGroup);
+
+  // Draw nodes
+  const nodeGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  for (const n of graph.nodes) {
+    const [cx, cy] = layout[n];
+    const isCurrent = currentNode === n;
+    const isVisited = visited && visited.has(n);
+    const isSource  = n === currentSource();
+    const inQueue   = stepData && stepData.pq && stepData.pq.find(x => x.node === n);
+
+    let fill = "#22263a", stroke = "#a78bfa";
+    if (isSource)  { fill = "#1e3a5f"; stroke = "#4f8ef7"; }
+    if (isVisited) { fill = "#1a3a2a"; stroke = "#3ecf8e"; }
+    if (isCurrent) { fill = "#3a2e00"; stroke = "#f7c948"; }
+    if (inQueue && !isVisited && !isCurrent) stroke = "#f76f6f";
+
+    // Pulse ring for current node
+    if (isCurrent) {
+      const pulse = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      pulse.setAttribute("cx", cx); pulse.setAttribute("cy", cy);
+      pulse.setAttribute("r", 22);
+      pulse.setAttribute("fill", "none");
+      pulse.setAttribute("stroke", "#f7c94840");
+      pulse.setAttribute("stroke-width", "8");
+      pulse.classList.add("pulse-circle");
+      nodeGroup.appendChild(pulse);
+    }
+
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", cx); circle.setAttribute("cy", cy);
+    circle.setAttribute("r", 22);
+    circle.setAttribute("fill", fill);
+    circle.setAttribute("stroke", stroke);
+    circle.setAttribute("stroke-width", isCurrent ? "3" : "2");
+    circle.style.transition = "fill .25s, stroke .25s";
+    nodeGroup.appendChild(circle);
+
+    // Node label
+    const lbl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    lbl.setAttribute("x", cx); lbl.setAttribute("y", cy);
+    lbl.setAttribute("fill", isCurrent ? "#f7c948" : isVisited ? "#3ecf8e" : "#e2e8f0");
+    lbl.setAttribute("font-size", "14"); lbl.setAttribute("font-weight", "700");
+    lbl.setAttribute("font-family", "Segoe UI, sans-serif");
+    lbl.setAttribute("text-anchor", "middle"); lbl.setAttribute("dominant-baseline", "central");
+    lbl.textContent = n;
+    nodeGroup.appendChild(lbl);
+
+    // Distance label below node
+    const d = dist && dist[n] !== undefined ? (dist[n] === Infinity ? "∞" : dist[n]) : "∞";
+    const dLbl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    dLbl.setAttribute("x", cx); dLbl.setAttribute("y", cy + 36);
+    dLbl.setAttribute("fill", isCurrent ? "#f7c948" : updatedNode === n ? "#f7965a" : isVisited ? "#3ecf8e" : "#8892b0");
+    dLbl.setAttribute("font-size", "11"); dLbl.setAttribute("font-family", "Consolas, monospace");
+    dLbl.setAttribute("text-anchor", "middle"); dLbl.setAttribute("dominant-baseline", "central");
+    dLbl.textContent = `d=${d}`;
+    nodeGroup.appendChild(dLbl);
+  }
+  svg.appendChild(nodeGroup);
+}
+
+function appendMarker(svgEl, id, color) {
+  const defs = svgEl.querySelector("defs") || (() => {
+    const d = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    svgEl.insertBefore(d, svgEl.firstChild);
+    return d;
+  })();
+  const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+  marker.setAttribute("id", id);
+  marker.setAttribute("viewBox", "0 0 10 10");
+  marker.setAttribute("refX", "5"); marker.setAttribute("refY", "5");
+  marker.setAttribute("markerWidth", "6"); marker.setAttribute("markerHeight", "6");
+  marker.setAttribute("orient", "auto-start-reverse");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+  path.setAttribute("fill", color);
+  marker.appendChild(path);
+  defs.appendChild(marker);
+}
+
+// ─── Update UI for a step ──────────────────────────────────────
+function applyStep(idx) {
+  if (!steps.length) return;
+  idx = Math.max(0, Math.min(steps.length - 1, idx));
+  currentStep = idx;
+  const s = steps[idx];
+
+  // Render graph
+  renderGraph(s);
+
+  // Update step counter
+  $("step-counter").textContent = `Step ${idx + 1} / ${steps.length}`;
+
+  // Update pseudocode highlight
+  highlightPseudo(s.pseudoLine);
+
+  // Update explanation
+  $("explanation-text").innerHTML = s.explanation;
+
+  // Update distance table
+  renderDistTable(s.dist, s.prev, s.visited, s.currentNode, s.updatedNode);
+
+  // Update priority queue display
+  renderPQ(s.pq, s.currentNode);
+
+  // Update stats (cumulative)
+  updateStatsUpTo(idx);
+
+  // History highlight
+  highlightHistory(idx);
+
+  // Button states
+  $("btn-step").disabled  = idx >= steps.length - 1;
+  $("btn-play").disabled  = idx >= steps.length - 1;
+  $("btn-pause").disabled = !playInterval;
+
+  // Status
+  if (s.done) setStatus("done");
+}
+
+function highlightPseudo(lineIdx) {
+  const lines = document.querySelectorAll(".pseudo-line");
+  lines.forEach((el, i) => {
+    el.classList.toggle("active", i === lineIdx);
+    if (i === lineIdx) el.scrollIntoView({ block: "nearest" });
+  });
+}
+
+function renderDistTable(dist, prev, visited, currentNode, updatedNode) {
+  const tbody = $("dist-tbody");
+  tbody.innerHTML = "";
+  if (!dist) return;
+  for (const n of graph.nodes) {
+    const tr = document.createElement("tr");
+    const d = dist[n] === Infinity ? "∞" : dist[n];
+    const p = prev && prev[n] ? prev[n] : "–";
+    if (n === currentNode) tr.className = "current-row";
+    else if (visited && visited.has(n)) tr.className = "visited-row";
+    else if (n === updatedNode) tr.className = "updated-row";
+    tr.innerHTML = `<td>${n}</td><td>${d}</td><td>${p}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderPQ(pq, currentNode) {
+  const el = $("pq-list");
+  if (!pq || !pq.length) { el.innerHTML = '<span style="color:var(--muted);font-size:12px;">Empty</span>'; return; }
+  const sorted = [...pq].sort((a, b) => a.dist - b.dist);
+  el.innerHTML = sorted.map((item, i) => {
+    const d = item.dist === Infinity ? "∞" : item.dist;
+    const cls = i === 0 ? "pq-item pq-min" : item.updated ? "pq-item pq-updated" : "pq-item";
+    return `<div class="${cls}">${item.node}: ${d}</div>`;
+  }).join("");
+}
+
+function updateStatsUpTo(idx) {
+  let rel = 0, cmp = 0, proc = 0;
+  for (let i = 0; i <= idx; i++) {
+    const s = steps[i];
+    if (s.action === "relax")   rel++;
+    if (s.action === "examine" || s.action === "extract") cmp++;
+    if (s.action === "extract") proc++;
+  }
+  $("stat-relaxations").textContent = rel;
+  $("stat-comparisons").textContent = cmp;
+  $("stat-processed").textContent   = proc;
+}
+
+function highlightHistory(activeIdx) {
+  document.querySelectorAll("#history-tbody tr").forEach((tr, i) => {
+    tr.classList.toggle("hist-active", i === activeIdx);
+    if (i === activeIdx) tr.scrollIntoView({ block: "nearest" });
+  });
+}
+
+function buildHistoryTable() {
+  const tbody = $("history-tbody");
+  tbody.innerHTML = "";
+  const MAX = 30;
+  const start = Math.max(0, steps.length - MAX);
+  steps.forEach((s, i) => {
+    const tr = document.createElement("tr");
+    const action = s.action || (s.done ? "done" : "init");
+    const node = s.currentNode || "–";
+    const dist = s.currentNode && s.dist ? (s.dist[s.currentNode] === Infinity ? "∞" : s.dist[s.currentNode]) : "–";
+    tr.innerHTML = `<td>${i + 1}</td><td>${action}</td><td>${node}</td><td>${dist}</td>`;
+    tr.addEventListener("click", () => { stopPlay(); applyStep(i); setStatus("paused"); });
+    tbody.appendChild(tr);
+  });
+}
+
+// ─── Pseudocode rendering ───────────────────────────────────────
+function buildPseudocode() {
+  const container = $("pseudocode-lines");
+  container.innerHTML = "";
+  PSEUDO.forEach((line, i) => {
+    const div = document.createElement("div");
+    div.className = "pseudo-line";
+    div.innerHTML = `
+      <span class="pseudo-num">${i + 1}</span>
+      <span class="pseudo-text">${escHtml(line.text)}</span>
+      <span class="tooltip">${escHtml(line.tip)}</span>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ─── Status helper ──────────────────────────────────────────────
+function setStatus(state) {
+  const badge = $("status-badge");
+  badge.className = state;
+  badge.textContent = state.toUpperCase();
+}
+
+// ─── Source helper ──────────────────────────────────────────────
+function currentSource() {
+  return $("source-input").value.trim() || "A";
+}
+
+// ─── Load a preset ─────────────────────────────────────────────
+function loadPreset(idx) {
+  const p = PRESETS[idx];
+  $("source-input").value = p.source;
+  const edgeText = p.edges.map(([u, v, w]) => `${u} ${v} ${w}`).join("\n");
+  $("edge-input").value = edgeText;
+  buildGraph(p.edges, [...new Set(p.edges.flatMap(([u,v]) => [u,v]))], p.layout);
+  resetAll();
+  renderGraph({
+    dist: Object.fromEntries(graph.nodes.map(n => [n, n === p.source ? 0 : Infinity])),
+    prev: Object.fromEntries(graph.nodes.map(n => [n, null])),
+    visited: new Set(), pq: graph.nodes.map(n => ({ node: n, dist: n === p.source ? 0 : Infinity }))
+  });
+  renderDistTable(
+    Object.fromEntries(graph.nodes.map(n => [n, n === p.source ? 0 : Infinity])),
+    {}, new Set(), null, null
+  );
+  setStatus("idle");
+  $("explanation-text").textContent = `Graph "${p.name}" loaded. Source: ${p.source}. Click Build Steps to begin.`;
+}
+
+// ─── Load custom graph ──────────────────────────────────────────
+function loadCustomGraph() {
+  const text = $("edge-input").value;
+  const { edges, nodes } = parseEdges(text);
+  if (!edges.length) { alert("No valid edges found. Format: FROM TO WEIGHT (one per line)"); return; }
+  buildGraph(edges, nodes, null);
+  resetAll();
+  const source = currentSource();
+  renderGraph({
+    dist: Object.fromEntries(graph.nodes.map(n => [n, n === source ? 0 : Infinity])),
+    prev: Object.fromEntries(graph.nodes.map(n => [n, null])),
+    visited: new Set(), pq: graph.nodes.map(n => ({ node: n, dist: n === source ? 0 : Infinity }))
+  });
+  renderDistTable(
+    Object.fromEntries(graph.nodes.map(n => [n, n === source ? 0 : Infinity])),
+    {}, new Set(), null, null
+  );
+  setStatus("idle");
+  $("explanation-text").textContent = `Custom graph loaded (${nodes.length} nodes, ${edges.length} edges). Source: ${source}. Click Build Steps to begin.`;
+}
+
+// ─── Build all steps ───────────────────────────────────────────
+function buildSteps() {
+  const source = currentSource();
+  if (!graph.nodes.includes(source)) {
+    alert(`Source node "${source}" not found in graph.`); return;
+  }
+  const result = runDijkstra(source);
+  steps = result.steps;
+  currentStep = -1;
+  buildHistoryTable();
+  applyStep(0);
+  setStatus("ready");
+  $("btn-step").disabled  = false;
+  $("btn-play").disabled  = false;
+  $("btn-reset").disabled = false;
+}
+
+// ─── Playback ──────────────────────────────────────────────────
+function startPlay() {
+  if (playInterval) return;
+  if (currentStep >= steps.length - 1) applyStep(0);
+  setStatus("playing");
+  $("btn-play").disabled  = true;
+  $("btn-pause").disabled = false;
+  const delay = () => Math.round(1200 / speed);
+  playInterval = setInterval(() => {
+    if (currentStep >= steps.length - 1) {
+      stopPlay(); setStatus("done"); return;
+    }
+    applyStep(currentStep + 1);
+  }, delay());
+}
+
+function stopPlay() {
+  if (playInterval) { clearInterval(playInterval); playInterval = null; }
+  $("btn-play").disabled  = currentStep >= steps.length - 1;
+  $("btn-pause").disabled = true;
+}
+
+function resetAll() {
+  stopPlay();
+  steps = [];
+  currentStep = -1;
+  $("step-counter").textContent = "Step – / –";
+  $("stat-relaxations").textContent = "0";
+  $("stat-comparisons").textContent = "0";
+  $("stat-processed").textContent   = "0";
+  $("history-tbody").innerHTML = "";
+  $("pq-list").innerHTML = '<span style="color:var(--muted);font-size:12px;">–</span>';
+  $("dist-tbody").innerHTML = "";
+  highlightPseudo(-1);
+  $("btn-step").disabled  = true;
+  $("btn-play").disabled  = true;
+  $("btn-pause").disabled = true;
+  $("btn-reset").disabled = true;
+  setStatus("idle");
+}
+
+// ─── Event Listeners ───────────────────────────────────────────
+document.querySelectorAll(".preset-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    loadPreset(+btn.dataset.preset);
+  });
+});
+
+$("btn-load-custom").addEventListener("click", loadCustomGraph);
+$("btn-build").addEventListener("click", buildSteps);
+$("btn-step").addEventListener("click", () => {
+  stopPlay();
+  applyStep(currentStep + 1);
+  setStatus("paused");
+});
+$("btn-play").addEventListener("click", startPlay);
+$("btn-pause").addEventListener("click", () => { stopPlay(); setStatus("paused"); });
+$("btn-reset").addEventListener("click", () => { resetAll(); loadPreset(+document.querySelector(".preset-btn.active").dataset.preset); });
+
+$("speed-slider").addEventListener("input", e => {
+  speed = parseFloat(e.target.value);
+  $("speed-label").textContent = `${speed}x`;
+  if (playInterval) { stopPlay(); startPlay(); }
+});
+
+// Resize: re-render when window changes
+window.addEventListener("resize", () => {
+  if (graph.nodes.length) {
+    if (steps.length && currentStep >= 0) renderGraph(steps[currentStep]);
+    else renderGraph({
+      dist: Object.fromEntries(graph.nodes.map(n => [n, Infinity])),
+      prev: {}, visited: new Set(), pq: []
+    });
+  }
+});
+
+// ─── Growth Chart ───────────────────────────────────────────────
+function drawGrowthChart() {
+  const svgEl = document.getElementById("growth-svg");
+  const W = svgEl.parentElement.clientWidth - 32;
+  const H = 260;
+  const PAD = { top: 20, right: 20, bottom: 40, left: 60 };
+  const maxV = parseInt(document.getElementById("n-slider").value);
+
+  svgEl.setAttribute("width", W);
+  svgEl.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svgEl.innerHTML = "";
+
+  const ns = "http://www.w3.org/2000/svg";
+  const mk = tag => document.createElementNS(ns, tag);
+
+  // Data generation
+  const points = [];
+  const steps = 20;
+  for (let i = 1; i <= steps; i++) {
+    const v = Math.round((i / steps) * maxV);
+    const e = v * 3; // sparse: E ≈ 3V
+    points.push({
+      v,
+      dijkHeap: (v + e) * Math.log2(v + 1),       // O((V+E)logV)
+      dijkArray: v * v,                              // O(V²)
+      bellman: v * e,                                // O(VE)
+      theoretical: (v + e) * Math.log2(v + 1) * 1.1 // O((V+E)logV) theoretical line
+    });
+  }
+
+  // Scale
+  const allVals = points.flatMap(p => [p.dijkHeap, p.dijkArray, p.bellman]);
+  const maxY = Math.max(...allVals) * 1.1;
+  const cw = W - PAD.left - PAD.right;
+  const ch = H - PAD.top - PAD.bottom;
+
+  const sx = v => PAD.left + (v / maxV) * cw;
+  const sy = y => PAD.top + ch - (y / maxY) * ch;
+
+  // Grid lines
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.top + (ch * i / 4);
+    const line = mk("line");
+    line.setAttribute("x1", PAD.left); line.setAttribute("x2", PAD.left + cw);
+    line.setAttribute("y1", y); line.setAttribute("y2", y);
+    line.setAttribute("stroke", "#2e3354"); line.setAttribute("stroke-width", "1");
+    svgEl.appendChild(line);
+
+    const val = Math.round(maxY * (1 - i / 4));
+    const lbl = mk("text");
+    lbl.setAttribute("x", PAD.left - 6); lbl.setAttribute("y", y + 4);
+    lbl.setAttribute("fill", "#8892b0"); lbl.setAttribute("font-size", "10");
+    lbl.setAttribute("text-anchor", "end"); lbl.setAttribute("font-family", "Consolas,monospace");
+    lbl.textContent = val > 1000 ? (val / 1000).toFixed(1) + "k" : val;
+    svgEl.appendChild(lbl);
+  }
+
+  // X-axis ticks
+  for (let i = 0; i <= 5; i++) {
+    const v = Math.round((i / 5) * maxV);
+    const x = sx(v);
+    const line = mk("line");
+    line.setAttribute("x1", x); line.setAttribute("x2", x);
+    line.setAttribute("y1", PAD.top); line.setAttribute("y2", PAD.top + ch);
+    line.setAttribute("stroke", "#2e3354"); line.setAttribute("stroke-width", "1");
+    svgEl.appendChild(line);
+
+    const lbl = mk("text");
+    lbl.setAttribute("x", x); lbl.setAttribute("y", PAD.top + ch + 16);
+    lbl.setAttribute("fill", "#8892b0"); lbl.setAttribute("font-size", "10");
+    lbl.setAttribute("text-anchor", "middle"); lbl.setAttribute("font-family", "Consolas,monospace");
+    lbl.textContent = v;
+    svgEl.appendChild(lbl);
+  }
+
+  // Axis labels
+  const xAxisLbl = mk("text");
+  xAxisLbl.setAttribute("x", PAD.left + cw / 2);
+  xAxisLbl.setAttribute("y", H - 4);
+  xAxisLbl.setAttribute("fill", "#8892b0"); xAxisLbl.setAttribute("font-size", "11");
+  xAxisLbl.setAttribute("text-anchor", "middle"); xAxisLbl.setAttribute("font-family", "Segoe UI,sans-serif");
+  xAxisLbl.textContent = "Number of Vertices (V)";
+  svgEl.appendChild(xAxisLbl);
+
+  const yAxisLbl = mk("text");
+  yAxisLbl.setAttribute("transform", `rotate(-90, 12, ${H / 2})`);
+  yAxisLbl.setAttribute("x", 12); yAxisLbl.setAttribute("y", H / 2 + 4);
+  yAxisLbl.setAttribute("fill", "#8892b0"); yAxisLbl.setAttribute("font-size", "11");
+  yAxisLbl.setAttribute("text-anchor", "middle"); yAxisLbl.setAttribute("font-family", "Segoe UI,sans-serif");
+  yAxisLbl.textContent = "Operations (est.)";
+  svgEl.appendChild(yAxisLbl);
+
+  // Draw polyline helper
+  function drawLine(key, color, dashArray) {
+    const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${sx(p.v).toFixed(1)},${sy(p[key]).toFixed(1)}`).join(" ");
+    const path = mk("path");
+    path.setAttribute("d", d);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", color);
+    path.setAttribute("stroke-width", "2.5");
+    if (dashArray) path.setAttribute("stroke-dasharray", dashArray);
+    path.setAttribute("stroke-linejoin", "round");
+    path.setAttribute("stroke-linecap", "round");
+    svgEl.appendChild(path);
+  }
+
+  drawLine("theoretical", "#3ecf8e", "6 4");
+  drawLine("bellman",     "#f76f6f");
+  drawLine("dijkArray",   "#f7c948");
+  drawLine("dijkHeap",    "#4f8ef7");
+
+  // Highlight current V marker (live dot on Dijkstra heap line)
+  const lastPt = points[points.length - 1];
+  const dot = mk("circle");
+  dot.setAttribute("cx", sx(lastPt.v).toFixed(1));
+  dot.setAttribute("cy", sy(lastPt.dijkHeap).toFixed(1));
+  dot.setAttribute("r", "5");
+  dot.setAttribute("fill", "#4f8ef7");
+  dot.setAttribute("stroke", "#fff");
+  dot.setAttribute("stroke-width", "1.5");
+  svgEl.appendChild(dot);
+}
+
+// Slider interaction for growth chart
+document.getElementById("n-slider").addEventListener("input", e => {
+  document.getElementById("n-label").textContent = e.target.value;
+  drawGrowthChart();
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   CLO-2: Priority Queue Visualizer
+   ═══════════════════════════════════════════════════════════════ */
+
+// ─── Min-Heap implementation for demo ──────────────────────────
+class MinHeap {
+  constructor() { this.data = []; this.lastOp = null; this.lastIdx = -1; }
+
+  _swap(i, j) { [this.data[i], this.data[j]] = [this.data[j], this.data[i]]; }
+
+  _parent(i) { return Math.floor((i - 1) / 2); }
+  _left(i)   { return 2 * i + 1; }
+  _right(i)  { return 2 * i + 2; }
+
+  insert(node, dist) {
+    this.data.push({ node, dist, state: "normal" });
+    let i = this.data.length - 1;
+    while (i > 0 && this.data[this._parent(i)].dist > this.data[i].dist) {
+      this._swap(i, this._parent(i));
+      i = this._parent(i);
+    }
+    this.lastOp = "insert"; this.lastIdx = i;
+  }
+
+  extractMin() {
+    if (!this.data.length) return null;
+    const min = this.data[0];
+    const last = this.data.pop();
+    if (this.data.length) {
+      this.data[0] = last;
+      this._siftDown(0);
+    }
+    this.lastOp = "extract"; this.lastIdx = 0;
+    return min;
+  }
+
+  decreaseKey(node, newDist) {
+    let i = this.data.findIndex(x => x.node === node);
+    if (i === -1) return;
+    this.data[i].dist = newDist;
+    this.data[i].state = "updated";
+    while (i > 0 && this.data[this._parent(i)].dist > this.data[i].dist) {
+      this._swap(i, this._parent(i));
+      i = this._parent(i);
+    }
+    this.lastOp = "decrease"; this.lastIdx = i;
+  }
+
+  _siftDown(i) {
+    const n = this.data.length;
+    while (true) {
+      let smallest = i;
+      const l = this._left(i), r = this._right(i);
+      if (l < n && this.data[l].dist < this.data[smallest].dist) smallest = l;
+      if (r < n && this.data[r].dist < this.data[smallest].dist) smallest = r;
+      if (smallest === i) break;
+      this._swap(i, smallest);
+      i = smallest;
+    }
+  }
+}
+
+// Demo heap state
+let demoHeap = new MinHeap();
+// Sample data for demo: nodes A-G with distances
+const DEMO_HEAP_DATA = [
+  { node: "A", dist: 0 },
+  { node: "B", dist: 4 },
+  { node: "C", dist: 2 },
+  { node: "D", dist: 7 },
+  { node: "E", dist: 5 },
+  { node: "F", dist: 3 },
+  { node: "G", dist: 9 },
+];
+
+function buildDemoHeap() {
+  demoHeap = new MinHeap();
+  for (const { node, dist } of DEMO_HEAP_DATA) demoHeap.insert(node, dist);
+  renderHeap(demoHeap, "Heap built from nodes A–G with initial distances.");
+  $("btn-heap-extract").disabled = false;
+}
+
+function extractDemoMin() {
+  if (!demoHeap.data.length) { $("heap-op-label").textContent = "Heap is empty."; return; }
+  const min = demoHeap.extractMin();
+  const opText = `EXTRACT-MIN → removed ${min.node} (dist=${min.dist}). Root replaced, sift-down applied.`;
+  renderHeap(demoHeap, opText);
+  if (!demoHeap.data.length) $("btn-heap-extract").disabled = true;
+}
+
+function renderHeap(heap, opText) {
+  $("heap-op-label").textContent = opText;
+  drawHeapSVG(heap);
+  drawArrayView(heap);
+}
+
+function drawHeapSVG(heap) {
+  const svgEl = $("heap-svg");
+  const W = svgEl.parentElement.clientWidth - 16;
+  const H = 200;
+  svgEl.setAttribute("width", W);
+  svgEl.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svgEl.innerHTML = "";
+
+  const ns = "http://www.w3.org/2000/svg";
+  const mk = tag => document.createElementNS(ns, tag);
+  const n = heap.data.length;
+  if (!n) {
+    const t = mk("text");
+    t.setAttribute("x", W / 2); t.setAttribute("y", H / 2);
+    t.setAttribute("fill", "#8892b0"); t.setAttribute("font-size", "13");
+    t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "central");
+    t.textContent = "Heap is empty";
+    svgEl.appendChild(t);
+    return;
+  }
+
+  // Calculate node positions level by level
+  const R = 22;
+  const positions = [];
+  for (let i = 0; i < n; i++) {
+    const level = Math.floor(Math.log2(i + 1));
+    const levelStart = Math.pow(2, level) - 1;
+    const levelCount = Math.min(Math.pow(2, level), n - levelStart);
+    const pos = i - levelStart;
+    const totalLevels = Math.floor(Math.log2(n)) + 1;
+    const levelWidth = W / (levelCount + 1);
+    const x = levelWidth * (pos + 1);
+    const y = 30 + level * (H - 30) / totalLevels;
+    positions.push({ x, y });
+  }
+
+  // Draw edges first
+  for (let i = 1; i < n; i++) {
+    const p = Math.floor((i - 1) / 2);
+    const { x: x1, y: y1 } = positions[p];
+    const { x: x2, y: y2 } = positions[i];
+    const line = mk("line");
+    line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+    line.setAttribute("stroke", "#2e3354"); line.setAttribute("stroke-width", "1.5");
+    svgEl.appendChild(line);
+  }
+
+  // Draw nodes
+  for (let i = 0; i < n; i++) {
+    const { x, y } = positions[i];
+    const item = heap.data[i];
+    const isMin = i === 0;
+    const isUpdated = item.state === "updated";
+
+    const fill = isMin ? "#2a2400" : isUpdated ? "#2a1a00" : "#22263a";
+    const stroke = isMin ? "#f7c948" : isUpdated ? "#f7965a" : "#2e3354";
+
+    const circle = mk("circle");
+    circle.setAttribute("cx", x); circle.setAttribute("cy", y);
+    circle.setAttribute("r", R);
+    circle.setAttribute("fill", fill); circle.setAttribute("stroke", stroke);
+    circle.setAttribute("stroke-width", isMin ? "2.5" : "1.5");
+    svgEl.appendChild(circle);
+
+    // Node name
+    const lbl = mk("text");
+    lbl.setAttribute("x", x); lbl.setAttribute("y", y - 6);
+    lbl.setAttribute("fill", isMin ? "#f7c948" : isUpdated ? "#f7965a" : "#e2e8f0");
+    lbl.setAttribute("font-size", "12"); lbl.setAttribute("font-weight", "700");
+    lbl.setAttribute("font-family", "Segoe UI,sans-serif");
+    lbl.setAttribute("text-anchor", "middle"); lbl.setAttribute("dominant-baseline", "central");
+    lbl.textContent = item.node;
+    svgEl.appendChild(lbl);
+
+    // Distance
+    const dLbl = mk("text");
+    dLbl.setAttribute("x", x); dLbl.setAttribute("y", y + 8);
+    dLbl.setAttribute("fill", isMin ? "#f7c948" : "#8892b0");
+    dLbl.setAttribute("font-size", "10"); dLbl.setAttribute("font-family", "Consolas,monospace");
+    dLbl.setAttribute("text-anchor", "middle"); dLbl.setAttribute("dominant-baseline", "central");
+    dLbl.textContent = item.dist;
+    svgEl.appendChild(dLbl);
+
+    // Array index label
+    const idxLbl = mk("text");
+    idxLbl.setAttribute("x", x); idxLbl.setAttribute("y", y + R + 10);
+    idxLbl.setAttribute("fill", "#4a5080"); idxLbl.setAttribute("font-size", "9");
+    idxLbl.setAttribute("font-family", "Consolas,monospace");
+    idxLbl.setAttribute("text-anchor", "middle");
+    idxLbl.textContent = `[${i}]`;
+    svgEl.appendChild(idxLbl);
+  }
+}
+
+function drawArrayView(heap) {
+  const wrap = $("array-view");
+  wrap.innerHTML = "";
+  heap.data.forEach((item, i) => {
+    const isMin = i === 0;
+    const isUpdated = item.state === "updated";
+    const cell = document.createElement("div");
+    cell.className = "array-cell";
+    const boxClass = isMin ? "ac-min" : isUpdated ? "ac-updated" : "ac-normal";
+    cell.innerHTML = `
+      <div class="array-cell-box ${boxClass}">${item.node}<br><span style="font-size:9px;opacity:.7">${item.dist}</span></div>
+      <div class="array-cell-idx">[${i}]</div>
+    `;
+    wrap.appendChild(cell);
+  });
+  if (!heap.data.length) wrap.innerHTML = '<span style="color:var(--muted);font-size:12px;">Empty</span>';
+}
+
+// ─── PQ Operation Trace (populated after Dijkstra runs) ────────
+let pqTraceLog = [];
+
+function recordPQTrace(op, node, dist, desc) {
+  pqTraceLog.push({ op, node, dist, desc });
+}
+
+function renderPQTrace() {
+  const list = $("pq-trace-list");
+  if (!pqTraceLog.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px;">No trace yet. Run Dijkstra on the Graph tab first.</div>';
+    return;
+  }
+  list.innerHTML = "";
+  pqTraceLog.forEach((entry, i) => {
+    const row = document.createElement("div");
+    const opClass = entry.op === "extract" ? "tr-extract" : entry.op === "decrease" ? "tr-decrease" : "tr-init";
+    const opLabel = entry.op === "extract" ? "EXTRACT-MIN" : entry.op === "decrease" ? "DECREASE-KEY" : "INSERT";
+    const opColor = entry.op === "extract" ? "op-extract" : entry.op === "decrease" ? "op-decrease" : "op-init";
+    row.className = `pq-trace-row ${opClass}`;
+    row.innerHTML = `
+      <span class="pq-trace-step">${i + 1}</span>
+      <span class="pq-trace-op ${opColor}">${opLabel}</span>
+      <span class="pq-trace-desc">${entry.desc}</span>
+    `;
+    list.appendChild(row);
+  });
+}
+
+// ─── Tab System ────────────────────────────────────────────────
+function initTabs() {
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.tab;
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("tab-" + target).classList.add("active");
+      if (target === "clo1") drawGrowthChart();
+      if (target === "clo2") {
+        renderPQTrace();
+        if (!demoHeap.data.length) drawHeapSVG(demoHeap);
+      }
+      if (target === "clo3") drawCounterExample();
+    });
+  });
+}
+
+// Heap demo button wiring
+$("btn-heap-build").addEventListener("click", buildDemoHeap);
+$("btn-heap-extract").addEventListener("click", extractDemoMin);
+$("btn-heap-reset").addEventListener("click", () => {
+  demoHeap = new MinHeap();
+  $("heap-op-label").textContent = 'Click "Build Heap" to start';
+  $("array-view").innerHTML = "";
+  const svgEl = $("heap-svg");
+  const W = svgEl.parentElement.clientWidth - 16;
+  svgEl.setAttribute("width", W);
+  svgEl.setAttribute("viewBox", `0 0 ${W} 200`);
+  svgEl.innerHTML = "";
+  $("btn-heap-extract").disabled = true;
+});
+
+// ─── Patch runDijkstra to also populate PQ trace log ───────────
+function runDijkstra(source) {
+  pqTraceLog = [];
+
+  const INF = Infinity;
+  const dist = {}, prev = {}, visited = new Set();
+  for (const n of graph.nodes) { dist[n] = INF; prev[n] = null; }
+  dist[source] = 0;
+
+  let pq = graph.nodes.map(n => ({ node: n, dist: dist[n] }));
+
+  const recordedSteps = [];
+  let relaxations = 0, comparisons = 0, processed = 0;
+
+  // Log initial inserts
+  for (const n of graph.nodes) {
+    const d = n === source ? 0 : INF;
+    recordPQTrace("init", n, d, `INSERT ${n} with dist = ${d === INF ? "∞" : d}`);
+  }
+
+  const snap = (pseudoLine, explanation, extra = {}) => {
+    recordedSteps.push({
+      pseudoLine, explanation,
+      dist: { ...dist }, prev: { ...prev },
+      visited: new Set(visited),
+      pq: pq.map(x => ({ ...x })),
+      ...extra,
+    });
+  };
+
+  snap(1, `Initialize: Set all distances to ∞, source <span class="node-ref">${source}</span> = <span class="val-ref">0</span>.`);
+  snap(4, `Set dist[<span class="node-ref">${source}</span>] = <span class="val-ref">0</span>. Build priority queue with all vertices.`);
+
+  while (pq.length > 0) {
+    pq.sort((a, b) => a.dist - b.dist);
+    comparisons++;
+
+    const { node: u } = pq[0];
+    pq.shift();
+
+    if (dist[u] === INF) {
+      snap(7, `Node <span class="node-ref">${u}</span> is unreachable (distance = ∞). Skipping.`);
+      break;
+    }
+
+    visited.add(u);
+    processed++;
+
+    recordPQTrace("extract", u, dist[u], `EXTRACT-MIN → removed ${u} (dist = ${dist[u]}). Now finalized.`);
+
+    snap(7, `<span class="highlight">EXTRACT-MIN:</span> Removed <span class="node-ref">${u}</span> (dist = <span class="val-ref">${dist[u]}</span>) from priority queue. It is now <span class="highlight">finalized</span>.`,
+      { currentNode: u, action: "extract" });
+
+    for (const { to: v, w } of graph.adj[u]) {
+      comparisons++;
+      const alt = dist[u] + w;
+      snap(9, `Examining edge <span class="edge-ref">${u} → ${v}</span> (weight = <span class="val-ref">${w}</span>). Candidate: <span class="val-ref">${dist[u]} + ${w} = ${alt}</span> vs dist[<span class="node-ref">${v}</span>] = <span class="val-ref">${dist[v] === INF ? '∞' : dist[v]}</span>.`,
+        { currentNode: u, relaxEdge: [u, v], action: "examine" });
+
+      if (alt < dist[v]) {
+        const old = dist[v];
+        dist[v] = alt;
+        prev[v] = u;
+        relaxations++;
+
+        const pqEntry = pq.find(x => x.node === v);
+        if (pqEntry) { pqEntry.dist = alt; pqEntry.updated = true; }
+
+        recordPQTrace("decrease", v, alt,
+          `DECREASE-KEY ${v}: ${old === INF ? "∞" : old} → ${alt} (via ${u}). Bubble up in heap.`);
+
+        snap(11, `<span class="highlight">RELAXATION:</span> dist[<span class="node-ref">${v}</span>] updated from <span class="val-ref">${old === INF ? '∞' : old}</span> to <span class="val-ref">${alt}</span> via <span class="node-ref">${u}</span>. (DECREASE-KEY)`,
+          { currentNode: u, relaxEdge: [u, v], updatedNode: v, action: "relax" });
+      } else {
+        snap(10, `No update for <span class="node-ref">${v}</span>: candidate <span class="val-ref">${alt}</span> ≥ current <span class="val-ref">${dist[v] === INF ? '∞' : dist[v]}</span>.`,
+          { currentNode: u, relaxEdge: [u, v], action: "no-update" });
+      }
+    }
+  }
+
+  snap(13, `<span class="highlight">Algorithm complete!</span> All reachable nodes have their final shortest distances.`,
+    { done: true });
+
+  return { steps: recordedSteps, relaxations, comparisons, processed };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CLO-3: Greedy Paradigm Logic
+   ═══════════════════════════════════════════════════════════════ */
+
+// ─── Greedy Choice Animator ─────────────────────────────────────
+const GREEDY_DEMO = {
+  source: "S",
+  nodes: ["S","A","B","C","D","E","F"],
+  edges: [
+    ["S","A",3],["S","B",2],["A","C",4],["A","D",2],
+    ["B","D",5],["B","E",3],["C","F",1],["D","C",1],
+    ["D","F",4],["D","E",1],["E","F",2],
+  ],
+  layout: { S:[60,120], A:[180,50], B:[180,190], C:[320,30], D:[320,140], E:[320,240], F:[440,120] }
+};
+
+let greedySteps = [];
+let greedyIdx = -1;
+
+function buildGreedySteps() {
+  const { source, nodes, edges } = GREEDY_DEMO;
+  const adj = {};
+  for (const n of nodes) adj[n] = [];
+  for (const [u, v, w] of edges) adj[u].push({ to: v, w });
+
+  const INF = Infinity;
+  const dist = {}, prev = {};
+  for (const n of nodes) { dist[n] = INF; prev[n] = null; }
+  dist[source] = 0;
+
+  const visited = new Set();
+  const result = [];
+  const choices = [];
+
+  result.push({
+    chosen: null, dist: { ...dist }, prev: { ...prev },
+    visited: new Set(visited),
+    explanation: `Initialize: dist[${source}] = 0, all others = ∞. Priority queue holds all nodes.`,
+    choices: []
+  });
+
+  while (visited.size < nodes.length) {
+    let u = null, minD = INF;
+    for (const n of nodes) {
+      if (!visited.has(n) && dist[n] < minD) { minD = dist[n]; u = n; }
+    }
+    if (!u || dist[u] === INF) break;
+
+    visited.add(u);
+    choices.push({ node: u, dist: dist[u] });
+
+    const relaxed = [];
+    for (const { to: v, w } of adj[u]) {
+      const alt = dist[u] + w;
+      if (alt < dist[v]) {
+        dist[v] = alt; prev[v] = u;
+        relaxed.push(`dist[${v}] → ${alt}`);
+      }
+    }
+
+    const relaxText = relaxed.length
+      ? `Relaxed: ${relaxed.join(", ")}.`
+      : `No neighbor improvements.`;
+
+    result.push({
+      chosen: u,
+      dist: { ...dist }, prev: { ...prev },
+      visited: new Set(visited),
+      explanation: `<strong>Greedy choice #${choices.length}:</strong> Pick unvisited node with smallest dist = <strong style="color:var(--yellow)">${u} (d=${dist[u]})</strong>. Finalize it. ${relaxText}`,
+      choices: choices.map(c => ({ ...c }))
+    });
+  }
+
+  result.push({
+    chosen: null, dist: { ...dist }, prev: { ...prev },
+    visited: new Set(visited),
+    explanation: `<strong style="color:var(--green)">Algorithm complete!</strong> All ${visited.size} reachable nodes have optimal distances.`,
+    choices: choices.map(c => ({ ...c })),
+    done: true
+  });
+
+  return result;
+}
+
+function renderGreedySVG(stepData) {
+  const svgEl = $("greedy-svg");
+  const W = svgEl.parentElement.clientWidth - 16;
+  const H = 290;
+  svgEl.setAttribute("width", W);
+  svgEl.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svgEl.innerHTML = "";
+
+  const ns = "http://www.w3.org/2000/svg";
+  const mk = tag => document.createElementNS(ns, tag);
+  const { nodes, edges, layout, source } = GREEDY_DEMO;
+  const { dist, visited, chosen, prev } = stepData;
+
+  const scaleX = (W - 80) / 440;
+  const pos = {};
+  for (const n of nodes) pos[n] = [layout[n][0] * scaleX + 40, layout[n][1]];
+
+  const spEdges = new Set();
+  for (const [v, u] of Object.entries(prev || {})) {
+    if (u) spEdges.add(`${u}->${v}`);
+  }
+
+  for (const [u, v, w] of edges) {
+    const [x1,y1] = pos[u], [x2,y2] = pos[v];
+    const isSP = spEdges.has(`${u}->${v}`);
+    const isRelax = chosen === u && !visited.has(v);
+    const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy);
+    const R=20, ux=dx/len, uy=dy/len;
+    const mid = `gm-${u}${v}`;
+    const mColor = isRelax ? "#f7965a" : isSP ? "#3ecf8e" : "#3a4060";
+
+    const defs = svgEl.querySelector("defs") || (() => {
+      const d = mk("defs"); svgEl.insertBefore(d, svgEl.firstChild); return d;
+    })();
+    const marker = mk("marker");
+    marker.setAttribute("id", mid);
+    marker.setAttribute("viewBox","0 0 10 10"); marker.setAttribute("refX","5"); marker.setAttribute("refY","5");
+    marker.setAttribute("markerWidth","5"); marker.setAttribute("markerHeight","5");
+    marker.setAttribute("orient","auto-start-reverse");
+    const mp = mk("path"); mp.setAttribute("d","M 0 0 L 10 5 L 0 10 z"); mp.setAttribute("fill", mColor);
+    marker.appendChild(mp); defs.appendChild(marker);
+
+    const line = mk("line");
+    line.setAttribute("x1", x1+ux*R); line.setAttribute("y1", y1+uy*R);
+    line.setAttribute("x2", x2-ux*(R+8)); line.setAttribute("y2", y2-uy*(R+8));
+    line.setAttribute("stroke", mColor);
+    line.setAttribute("stroke-width", isSP||isRelax ? "2.5" : "1.2");
+    line.setAttribute("opacity", isRelax||isSP ? "1" : "0.35");
+    line.setAttribute("marker-end", `url(#${mid})`);
+    svgEl.appendChild(line);
+
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    const perp=[-uy*10, ux*10];
+    const wt = mk("text");
+    wt.setAttribute("x", mx+perp[0]); wt.setAttribute("y", my+perp[1]);
+    wt.setAttribute("fill", isRelax ? "#f7965a" : "#5a6080");
+    wt.setAttribute("font-size","10"); wt.setAttribute("font-family","Consolas,monospace");
+    wt.setAttribute("text-anchor","middle"); wt.setAttribute("dominant-baseline","central");
+    wt.textContent = w;
+    svgEl.appendChild(wt);
+  }
+
+  for (const n of nodes) {
+    const [cx, cy] = pos[n];
+    const isCurrent = chosen === n;
+    const isVisited = visited.has(n);
+    const isSrc = n === source;
+
+    let fill = "#22263a", stroke = "#a78bfa";
+    if (isSrc)     { fill = "#1e3a5f"; stroke = "#4f8ef7"; }
+    if (isVisited) { fill = "#1a3a2a"; stroke = "#3ecf8e"; }
+    if (isCurrent) { fill = "#3a2e00"; stroke = "#f7c948"; }
+
+    if (isCurrent) {
+      const ring = mk("circle");
+      ring.setAttribute("cx", cx); ring.setAttribute("cy", cy); ring.setAttribute("r", 20);
+      ring.setAttribute("fill","none"); ring.setAttribute("stroke","#f7c94860"); ring.setAttribute("stroke-width","10");
+      ring.classList.add("pulse-circle");
+      svgEl.appendChild(ring);
+    }
+
+    const c = mk("circle");
+    c.setAttribute("cx", cx); c.setAttribute("cy", cy); c.setAttribute("r", 20);
+    c.setAttribute("fill", fill); c.setAttribute("stroke", stroke);
+    c.setAttribute("stroke-width", isCurrent ? "3" : "2");
+    svgEl.appendChild(c);
+
+    const lbl = mk("text");
+    lbl.setAttribute("x", cx); lbl.setAttribute("y", cy);
+    lbl.setAttribute("fill", isCurrent ? "#f7c948" : isVisited ? "#3ecf8e" : "#e2e8f0");
+    lbl.setAttribute("font-size","12"); lbl.setAttribute("font-weight","700");
+    lbl.setAttribute("font-family","Segoe UI,sans-serif");
+    lbl.setAttribute("text-anchor","middle"); lbl.setAttribute("dominant-baseline","central");
+    lbl.textContent = n;
+    svgEl.appendChild(lbl);
+
+    const d = dist[n] === Infinity ? "∞" : dist[n];
+    const dLbl = mk("text");
+    dLbl.setAttribute("x", cx); dLbl.setAttribute("y", cy + 30);
+    dLbl.setAttribute("fill", isCurrent ? "#f7c948" : isVisited ? "#3ecf8e" : "#6070a0");
+    dLbl.setAttribute("font-size","10"); dLbl.setAttribute("font-family","Consolas,monospace");
+    dLbl.setAttribute("text-anchor","middle"); dLbl.setAttribute("dominant-baseline","central");
+    dLbl.textContent = `d=${d}`;
+    svgEl.appendChild(dLbl);
+  }
+}
+
+function renderGreedyChoiceList(choices, done) {
+  const list = $("greedy-choice-list");
+  list.innerHTML = "";
+  if (!choices || !choices.length) {
+    list.innerHTML = '<span style="color:var(--muted);font-size:12px;">No choices yet.</span>';
+    return;
+  }
+  choices.forEach((c, i) => {
+    const isLast = (i === choices.length - 1) && !done;
+    const row = document.createElement("div");
+    row.className = `greedy-choice-row ${isLast ? "gc-current" : "gc-done"}`;
+    row.innerHTML = `
+      <span class="gc-num">${i+1}</span>
+      <span class="gc-node" style="color:${isLast?"#f7c948":"#3ecf8e"}">${c.node}</span>
+      <span class="gc-dist">d=${c.dist}</span>
+      <span class="gc-reason">Min dist among unvisited nodes</span>
+      <span class="gc-check">${isLast ? "👉" : "✅"}</span>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function applyGreedyStep(idx) {
+  if (!greedySteps.length) return;
+  idx = Math.max(0, Math.min(greedySteps.length - 1, idx));
+  greedyIdx = idx;
+  const s = greedySteps[idx];
+  renderGreedySVG(s);
+  $("greedy-step-box").innerHTML = s.explanation;
+  renderGreedyChoiceList(s.choices, !!s.done);
+  $("btn-greedy-prev").disabled = idx <= 0;
+  $("btn-greedy-next").disabled = idx >= greedySteps.length - 1;
+}
+
+$("btn-greedy-build").addEventListener("click", () => {
+  greedySteps = buildGreedySteps();
+  greedyIdx = -1;
+  applyGreedyStep(0);
+  $("btn-greedy-next").disabled = false;
+  $("btn-greedy-prev").disabled = true;
+});
+$("btn-greedy-next").addEventListener("click",  () => applyGreedyStep(greedyIdx + 1));
+$("btn-greedy-prev").addEventListener("click",  () => applyGreedyStep(greedyIdx - 1));
+$("btn-greedy-reset").addEventListener("click", () => {
+  greedySteps = []; greedyIdx = -1;
+  $("greedy-step-box").textContent = 'Click "Build" to animate greedy choices.';
+  $("greedy-choice-list").innerHTML = "";
+  const svgEl = $("greedy-svg");
+  svgEl.setAttribute("width", svgEl.parentElement.clientWidth - 16);
+  svgEl.innerHTML = "";
+  $("btn-greedy-prev").disabled = true;
+  $("btn-greedy-next").disabled = true;
+});
+
+// ─── Bellman-Ford Algorithm ─────────────────────────────────────
+function runBellmanFord(nodes, edges, source) {
+  const INF = Infinity;
+  const dist = {}, prev = {};
+  for (const n of nodes) { dist[n] = INF; prev[n] = null; }
+  dist[source] = 0;
+
+  const trace = [`Init: dist[${source}]=0, all others=∞`];
+
+  for (let pass = 1; pass <= nodes.length - 1; pass++) {
+    let updated = false;
+    for (const [u, v, w] of edges) {
+      if (dist[u] === INF) continue;
+      const alt = dist[u] + w;
+      if (alt < dist[v]) {
+        dist[v] = alt; prev[v] = u; updated = true;
+        trace.push(`Pass ${pass}: dist[${v}] → ${alt} (via ${u}, w=${w})`);
+      }
+    }
+    if (!updated) { trace.push(`Pass ${pass}: No updates — converged early.`); break; }
+  }
+
+  let hasNegCycle = false;
+  for (const [u, v, w] of edges) {
+    if (dist[u] !== INF && dist[u] + w < dist[v]) {
+      hasNegCycle = true;
+      trace.push(`⚠ Negative cycle detected!`);
+      break;
+    }
+  }
+
+  trace.push(`Result: ${Object.entries(dist).map(([n,d])=>`${n}=${d===INF?"∞":d}`).join(", ")}`);
+  return { dist, prev, trace, hasNegCycle };
+}
+
+// ─── Side-by-side comparison ────────────────────────────────────
+let bfUseNeg = false;
+
+function runBFComparison() {
+  const nodes = bfUseNeg ? ["A","B","C","D"] : GREEDY_DEMO.nodes;
+  const edges = bfUseNeg
+    ? [["A","B",4],["A","C",2],["B","D",3],["C","B",-5],["C","D",8]]
+    : GREEDY_DEMO.edges;
+  const source = bfUseNeg ? "A" : "S";
+
+  // Dijkstra
+  const INF = Infinity;
+  const dDist = {}, dPrev = {};
+  for (const n of nodes) { dDist[n] = INF; dPrev[n] = null; }
+  dDist[source] = 0;
+  let pq = nodes.map(n => ({ node: n, dist: dDist[n] }));
+  const dTrace = [`Init: dist[${source}]=0, all others=∞`];
+
+  const adj = {};
+  for (const n of nodes) adj[n] = [];
+  for (const [a, b, w] of edges) adj[a].push({ to: b, w });
+
+  while (pq.length) {
+    pq.sort((a, b) => a.dist - b.dist);
+    const { node: u } = pq.shift();
+    if (dDist[u] === INF) break;
+    dTrace.push(`Extract ${u} (d=${dDist[u]}) — finalized`);
+    for (const { to: v, w } of adj[u]) {
+      const alt = dDist[u] + w;
+      if (alt < dDist[v]) {
+        const old = dDist[v]; dDist[v] = alt; dPrev[v] = u;
+        const pqE = pq.find(x => x.node === v);
+        if (pqE) pqE.dist = alt;
+        dTrace.push(`  Relax ${u}→${v}: ${old===INF?"∞":old} → ${alt}`);
+      }
+    }
+  }
+  dTrace.push(`Result: ${Object.entries(dDist).map(([n,d])=>`${n}=${d===INF?"∞":d}`).join(", ")}`);
+
+  // Bellman-Ford
+  const bfResult = runBellmanFord(nodes, edges, source);
+
+  // Render traces
+  function renderTrace(id, traceArr) {
+    const el = $(id);
+    el.innerHTML = traceArr.map(line => {
+      let cls = "ati-relax";
+      if (line.includes("Extract") || line.includes("finalized")) cls = "ati-process";
+      if (line.includes("Result"))  cls = "ati-done";
+      if (line.includes("⚠"))       cls = "ati-error";
+      return `<div class="algo-trace-item ${cls}">${escHtml(line)}</div>`;
+    }).join("");
+  }
+  renderTrace("dijk-trace", dTrace);
+  renderTrace("bf-trace",   bfResult.trace);
+
+  // Verdict
+  const verdict = $("bf-verdict");
+  verdict.style.display = "block";
+  const match = Object.keys(bfResult.dist).every(n => bfResult.dist[n] === dDist[n]);
+  if (bfUseNeg && !match) {
+    verdict.className = "verdict-mismatch";
+    verdict.innerHTML = `⚠ <strong>Results DIFFER on negative-weight graph!</strong> Dijkstra gives wrong answers. Bellman-Ford correctly finds shorter paths through negative edges. This is why Dijkstra's greedy assumption fails here.`;
+  } else {
+    verdict.className = "verdict-match";
+    verdict.innerHTML = `✓ <strong>Results MATCH.</strong> Both algorithms find the same distances. ${bfUseNeg ? "The negative edge did not create a cycle here." : "Dijkstra is faster: O((V+E)logV) vs Bellman-Ford O(VE)." }`;
+  }
+}
+
+$("btn-bf-run").addEventListener("click", runBFComparison);
+$("btn-bf-neg").addEventListener("click", () => {
+  bfUseNeg = !bfUseNeg;
+  $("btn-bf-neg").textContent = bfUseNeg ? "Use Normal Graph" : "Use Negative-Weight Graph";
+  $("btn-bf-neg").className   = bfUseNeg ? "btn btn-danger btn-sm" : "btn btn-neutral btn-sm";
+  $("bf-verdict").style.display = "none";
+  $("dijk-trace").innerHTML = "";
+  $("bf-trace").innerHTML   = "";
+});
+
+// ─── Counter-Example SVG ────────────────────────────────────────
+function drawCounterExample() {
+  const svgEl = $("counter-svg");
+  if (!svgEl) return;
+  const W = 460, H = 160;
+  svgEl.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svgEl.innerHTML = "";
+
+  const ns = "http://www.w3.org/2000/svg";
+  const mk = tag => document.createElementNS(ns, tag);
+
+  const nodes = { A:[60,80], B:[240,35], C:[240,125], D:[400,80] };
+  const edges = [
+    { u:"A", v:"B", w:4,  color:"#4f8ef7", neg:false },
+    { u:"A", v:"C", w:2,  color:"#4f8ef7", neg:false },
+    { u:"C", v:"B", w:-5, color:"#f76f6f", neg:true  },
+    { u:"B", v:"D", w:3,  color:"#4f8ef7", neg:false },
+    { u:"C", v:"D", w:8,  color:"#4f8ef7", neg:false },
+  ];
+
+  for (const e of edges) {
+    const [x1,y1]=nodes[e.u], [x2,y2]=nodes[e.v];
+    const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy);
+    const R=22, ux=dx/len, uy=dy/len;
+    const mid=`ce${e.u}${e.v}`;
+
+    const defs = svgEl.querySelector("defs") || (() => {
+      const d=mk("defs"); svgEl.insertBefore(d, svgEl.firstChild); return d;
+    })();
+    const marker=mk("marker");
+    marker.setAttribute("id",mid); marker.setAttribute("viewBox","0 0 10 10");
+    marker.setAttribute("refX","5"); marker.setAttribute("refY","5");
+    marker.setAttribute("markerWidth","5"); marker.setAttribute("markerHeight","5");
+    marker.setAttribute("orient","auto-start-reverse");
+    const mp=mk("path"); mp.setAttribute("d","M 0 0 L 10 5 L 0 10 z"); mp.setAttribute("fill",e.color);
+    marker.appendChild(mp); defs.appendChild(marker);
+
+    const line=mk("line");
+    line.setAttribute("x1",x1+ux*R); line.setAttribute("y1",y1+uy*R);
+    line.setAttribute("x2",x2-ux*(R+8)); line.setAttribute("y2",y2-uy*(R+8));
+    line.setAttribute("stroke",e.color); line.setAttribute("stroke-width", e.neg ? "3" : "2");
+    line.setAttribute("marker-end",`url(#${mid})`);
+    svgEl.appendChild(line);
+
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    const perp=[-uy*14, ux*14];
+    const wt=mk("text");
+    wt.setAttribute("x",mx+perp[0]); wt.setAttribute("y",my+perp[1]);
+    wt.setAttribute("fill",e.neg?"#f76f6f":"#8892b0");
+    wt.setAttribute("font-size", e.neg?"14":"12");
+    wt.setAttribute("font-weight", e.neg?"800":"400");
+    wt.setAttribute("font-family","Consolas,monospace");
+    wt.setAttribute("text-anchor","middle"); wt.setAttribute("dominant-baseline","central");
+    wt.textContent=e.w;
+    svgEl.appendChild(wt);
+  }
+
+  const fills  = { A:"#1e3a5f", B:"#3a2200", C:"#22263a", D:"#22263a" };
+  const strokes= { A:"#4f8ef7", B:"#f7c948",  C:"#a78bfa", D:"#a78bfa" };
+  const labels = { A:"Source",  B:"Problem!", C:"",         D:"Target"  };
+
+  for (const [name,[cx,cy]] of Object.entries(nodes)) {
+    const c=mk("circle");
+    c.setAttribute("cx",cx); c.setAttribute("cy",cy); c.setAttribute("r",22);
+    c.setAttribute("fill",fills[name]); c.setAttribute("stroke",strokes[name]);
+    c.setAttribute("stroke-width","2.5"); svgEl.appendChild(c);
+
+    const lbl=mk("text");
+    lbl.setAttribute("x",cx); lbl.setAttribute("y",cy);
+    lbl.setAttribute("fill",strokes[name]);
+    lbl.setAttribute("font-size","14"); lbl.setAttribute("font-weight","700");
+    lbl.setAttribute("font-family","Segoe UI,sans-serif");
+    lbl.setAttribute("text-anchor","middle"); lbl.setAttribute("dominant-baseline","central");
+    lbl.textContent=name; svgEl.appendChild(lbl);
+
+    if (labels[name]) {
+      const sub=mk("text");
+      sub.setAttribute("x",cx); sub.setAttribute("y",cy+34);
+      sub.setAttribute("fill","#6070a0"); sub.setAttribute("font-size","9");
+      sub.setAttribute("font-family","Segoe UI,sans-serif"); sub.setAttribute("text-anchor","middle");
+      sub.textContent=labels[name]; svgEl.appendChild(sub);
+    }
+  }
+
+  const neg=mk("text");
+  neg.setAttribute("x",175); neg.setAttribute("y",92);
+  neg.setAttribute("fill","#f76f6f"); neg.setAttribute("font-size","9"); neg.setAttribute("font-weight","700");
+  neg.setAttribute("font-family","Segoe UI,sans-serif"); neg.setAttribute("text-anchor","middle");
+  neg.textContent="NEG EDGE"; svgEl.appendChild(neg);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Phase 5: Collapsible Sections
+   ═══════════════════════════════════════════════════════════════ */
+function toggleCollapsible(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle("open");
+}
+
+// ─── Init ──────────────────────────────────────────────────────
+buildPseudocode();
+initTabs();
+loadPreset(0);
+</script>
+</body>
+</html>
