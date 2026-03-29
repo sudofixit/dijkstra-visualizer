@@ -412,6 +412,81 @@ input[type="range"] {
   #pseudocode-panel { height: 200px; border-right: none; border-bottom: 1px solid var(--border); }
 }
 
+/* ─── Mobile (≤ 600px) ─────────────────────────────────────── */
+@media (max-width: 600px) {
+  html, body { font-size: 13px; }
+
+  /* Header */
+  #header { padding: 10px 14px; gap: 10px; flex-wrap: wrap; }
+  #header h1 { font-size: 15px; }
+  #header span { font-size: 11px; }
+
+  /* Left panel */
+  #left-panel { padding: 10px; gap: 10px; }
+
+  /* Cards */
+  .card { padding: 10px; }
+
+  /* Buttons — larger tap targets */
+  .btn { padding: 10px 12px; font-size: 13px; min-height: 44px; }
+  .btn-sm { padding: 8px 10px; font-size: 12px; min-height: 36px; }
+  #playback-row { gap: 6px; }
+  #playback-row .btn { flex: 1 1 calc(50% - 6px); }
+
+  /* Source input row wraps */
+  .input-row { flex-wrap: wrap; }
+  input[type="text"] { width: 100%; }
+
+  /* Stats — 2 cols on small, let 3rd wrap */
+  #stats-grid { grid-template-columns: 1fr 1fr; }
+  .stat-val { font-size: 18px; }
+
+  /* Tab bar — scrollable, equal tabs */
+  #tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tab-btn { padding: 10px 14px; font-size: 12px; flex-shrink: 0; }
+
+  /* Viz */
+  #right-panel { min-height: 420px; }
+  #tab-viz { min-height: 420px; }
+  #viz-container { min-height: 250px; }
+
+  /* Bottom panels */
+  #bottom-panels { height: auto; }
+  #pseudocode-panel { height: 180px; }
+  #explanation-panel { padding: 8px 10px; }
+  #explanation-text { font-size: 12px; }
+
+  /* Legend wraps tightly */
+  #legend { padding: 6px 10px; gap: 7px; }
+  .legend-item { font-size: 10px; }
+
+  /* PQ items */
+  .pq-item { padding: 4px 8px; font-size: 11px; }
+
+  /* Distance table */
+  #dist-table td, #dist-table th { padding: 4px 6px; font-size: 11px; }
+
+  /* History table */
+  #history-table td, #history-table th { padding: 3px 5px; font-size: 10px; }
+
+  /* Preset buttons — full width on very small */
+  #presets { flex-direction: column; }
+  .preset-btn { flex: none; width: 100%; }
+
+  /* Complexity panel */
+  #clo1-panel { padding: 10px; gap: 12px; }
+  .complexity-cards { grid-template-columns: 1fr 1fr; }
+
+  /* Tooltip — show above instead of to the side */
+  .pseudo-line .tooltip {
+    left: 0;
+    top: auto;
+    bottom: calc(100% + 4px);
+    margin-left: 0;
+    max-width: 90vw;
+  }
+}
+
 /* ─── Scrollbar ────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
@@ -2096,20 +2171,20 @@ const PRESETS = [
 
 // ─── Dijkstra Pseudocode ────────────────────────────────────────
 const PSEUDO = [
-  { text: "DIJKSTRA(G, w, s):",          tip: "Entry point: graph G, weight fn w, source s" },
-  { text: "  for each v ∈ G.V:",         tip: "Initialize all vertices in the graph" },
-  { text: "    dist[v] ← ∞",            tip: "Set initial distance to infinity (unknown)" },
-  { text: "    prev[v] ← NIL",           tip: "No predecessor yet" },
-  { text: "  dist[s] ← 0",              tip: "Distance from source to itself is 0" },
-  { text: "  Q ← BUILD-HEAP(G.V)",      tip: "Insert all vertices into the min-heap priority queue" },
-  { text: "  while Q ≠ ∅:",             tip: "Repeat until the queue is empty" },
-  { text: "    u ← EXTRACT-MIN(Q)",     tip: "Greedily pick vertex with smallest tentative distance" },
-  { text: "    for each v ∈ Adj[u]:",   tip: "Examine all neighbors of u" },
-  { text: "      alt ← dist[u] + w(u,v)",tip:"Compute candidate distance through u" },
-  { text: "      if alt < dist[v]:",    tip: "If this path is shorter than the known one…" },
-  { text: "        dist[v] ← alt",      tip: "Update (DECREASE-KEY) the shorter distance" },
-  { text: "        prev[v] ← u",        tip: "Record that we came from u" },
-  { text: "  return dist, prev",        tip: "Final shortest distances and predecessor map" },
+  { text: "function DIJKSTRA(graph, source):",      tip: "Entry point: takes a graph and a starting node" },
+  { text: "  for each node in graph:",              tip: "Initialize every node in the graph" },
+  { text: "    dist[node] = INFINITY",              tip: "We don't know the distance yet, so start at infinity" },
+  { text: "    prev[node] = NONE",                  tip: "No predecessor known yet" },
+  { text: "  dist[source] = 0",                     tip: "The source is 0 away from itself" },
+  { text: "  queue = all nodes (sorted by dist)",   tip: "Insert all nodes into a min-priority queue" },
+  { text: "  while queue is not empty:",            tip: "Keep going until all reachable nodes are settled" },
+  { text: "    u = node with smallest dist in queue", tip: "Greedily pick the closest unvisited node" },
+  { text: "    for each neighbor v of u:",          tip: "Check every node directly connected to u" },
+  { text: "      candidate = dist[u] + weight(u, v)", tip: "What would the distance be if we went through u?" },
+  { text: "      if candidate < dist[v]:",          tip: "Did we find a shorter path to v?" },
+  { text: "        dist[v] = candidate",            tip: "Yes — update v with the shorter distance" },
+  { text: "        prev[v] = u",                    tip: "Remember that the best path to v came through u" },
+  { text: "  return dist, prev",                    tip: "Return final shortest distances and the path tree" },
 ];
 
 // ─── State ─────────────────────────────────────────────────────
